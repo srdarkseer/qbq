@@ -5,7 +5,7 @@ typed **Behavioral State Graph**; only deterministic assertions on HTTP response
 database state count as findings.
 
 The full roadmap lives in [`global_agentic_qa_security_engine_build_plan.md`](global_agentic_qa_security_engine_build_plan.md).
-This repository currently implements **Milestone 1** only.
+This repository currently implements **Milestones 1 and 2**.
 
 ## Setup
 
@@ -40,10 +40,30 @@ trace over ASGI, evaluates the invariant without an LLM, and repeats (default 3x
   invariant must be confirmed.
 - **FPR**: `FP / (FP + TN)` over candidates whose invariant is not broken by any active bug.
 
+## Milestone 2: gray-box application compiler (`cubic.compiler`)
+
+`cubic compile` turns an ASGI app into a `StateGraph` plus a baseline invariant set.
+It needs no network access and no LLM.
+
+| Module | Role |
+| :--- | :--- |
+| `static.py` | Walks the source with Python's `ast` module. It extracts routes, methods, path and body parameters, auth dependencies, role, ownership and lifecycle guards (followed into same-file helpers), state writes, mutated fields, ledger writes, lock usage, Pydantic models and store collections. Each result keeps its source file and line. |
+| `dynamic.py` | Runs the app in-process. It starts the ASGI lifespan, fetches OpenAPI 3.x and inlines every `$ref`, binds live routes to their endpoint functions, and sends one unauthenticated probe per route to a fresh app instance. |
+| `merge.py` | Joins the two passes on (file, decorator line), falling back to (method, path). Runtime data decides paths and schemas; source code supplies guards and provenance. Output is sorted and canonicalized, so the same app always produces byte-identical JSON. |
+| `invariants.py` | Rule-based synthesis: auth (401), tenant isolation (403/404) on `{*_id}` routes, positivity on money-like numeric fields, ledger conservation, lifecycle preconditions, and functional 2xx checks. |
+| `fidelity.py` | Scores a compiled graph against a reference graph: route coverage, auth, path params, payloads and lifecycle. Role agreement is reported separately. |
+
+On the fintech testbed: 7/7 routes, structural fidelity 1.0 against the hand-written graph,
+and 23 synthesized invariants. `cubic eval --env fintech-compiled` runs the Milestone 1
+verifier on the compiled graph and gets Recall@1 100% and FPR 0%. Latency and compression
+numbers are in [`benchmarks/`](benchmarks/).
+
 ### CLI
 
 ```bash
-uv run cubic eval [--env fintech] [--runs 3] [--json reports/eval.json]
+uv run cubic compile cubic.gym.fintech.app:create_app --out graph.json [--personas actors.json] [--report report.json]
+uv run cubic compile path/to/app.py[:attr]   # module path or file; app instance or factory
+uv run cubic eval [--env fintech|fintech-compiled] [--runs 3] [--json reports/eval.json]
 uv run cubic graph            # dump the testbed State Graph
 uv run cubic schema           # dump the State Graph JSON Schema
 ```

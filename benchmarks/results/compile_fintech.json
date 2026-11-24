@@ -1,0 +1,55 @@
+{
+  "benchmark": "compile_fintech",
+  "cubic_version": "0.1.0",
+  "python": "3.11.9",
+  "platform": "Darwin arm64",
+  "iterations": 25,
+  "routes": {
+    "total": 7,
+    "compiled": 7,
+    "coverage": 1.0
+  },
+  "graph": {
+    "nodes": 8,
+    "edges": 7,
+    "invariants": 23
+  },
+  "bytes": {
+    "source": 10679,
+    "openapi": 5810,
+    "compiled_graph": 13282,
+    "structural_graph": 6801
+  },
+  "compression": {
+    "source_over_graph": 0.8040204788435477,
+    "source_over_structural_graph": 1.5702102631965886,
+    "source_plus_openapi_over_structural_graph": 2.42449639758859
+  },
+  "fidelity": {
+    "structural_fidelity": 1.0,
+    "route_coverage": 1.0,
+    "role_agreement": 0.42857142857142855
+  },
+  "latency": {
+    "dynamic": {
+      "median_ms": 24.026833998505026,
+      "p95_ms": 43.37237501749769,
+      "min_ms": 20.963417016901076
+    },
+    "static": {
+      "median_ms": 4.633624979760498,
+      "p95_ms": 5.186667025554925,
+      "min_ms": 3.9990830118767917
+    },
+    "merge_and_synthesis": {
+      "median_ms": 0.510083045810461,
+      "p95_ms": 0.9959999588318169,
+      "min_ms": 0.3813750226981938
+    },
+    "total": {
+      "median_ms": 29.385667003225535,
+      "p95_ms": 48.59408299671486,
+      "min_ms": 25.529958016704768
+    }
+  }
+}
