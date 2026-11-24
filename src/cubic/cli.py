@@ -26,7 +26,8 @@ def build_parser() -> argparse.ArgumentParser:
     ev.add_argument("--max-fpr", type=float, default=None, help="Fail if the FPR is above this")
 
     co = sub.add_parser("compile", help="Compile an ASGI app (source + runtime) into a State Graph")
-    co.add_argument("target", help="pkg.module[:attr] or path/to/app.py[:attr] (an app or app factory)")
+    co.add_argument("target", nargs="?", help="pkg.module[:attr] or path/to/app.py[:attr] (an app or app factory)")
+    co.add_argument("--app", dest="app_target", metavar="MODULE:FACTORY", help="Same as the positional target")
     co.add_argument("--out", type=Path, metavar="PATH", help="Write graph JSON here (default: stdout)")
     co.add_argument("--personas", type=Path, metavar="PATH",
                     help="JSON list of ActorPersona objects, or a StateGraph JSON to take actors from")
@@ -50,7 +51,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="Closed loop: compile, search, verify findings, synthesize + verify patches, export regression tests",
     )
     re_.add_argument("--env", default="fintech",
-                     help="Bug Gym app: fintech or saas (or any environment with an app source)")
+                     help="Bug Gym app: fintech, saas, agent-gateway (or any environment with an app source)")
+    re_.add_argument("--app", metavar="MODULE:FACTORY",
+                     help="Remediate your own FastAPI/ASGI app instead of a gym (factory returns a fresh app)")
+    re_.add_argument("--personas", type=Path, metavar="PATH",
+                     help="With --app: JSON list of ActorPersona objects (or a StateGraph JSON)")
+    re_.add_argument("--snapshot", metavar="MODULE:FUNC",
+                     help="With --app: function(app) -> DbSnapshot enabling ledger/state invariants")
     re_.add_argument("--variant", default="vulnerable", help="Build to remediate (default: vulnerable)")
     re_.add_argument("--runs", type=int, default=3, help="Replays per exploit / fix check (default: 3)")
     re_.add_argument("--out-dir", type=Path, default=Path("regression_tests"),
@@ -64,8 +71,8 @@ def build_parser() -> argparse.ArgumentParser:
     rl.add_argument("--out", type=Path, default=Path("datasets/cubic_rlvr.jsonl"),
                     help="Full dataset path (default: datasets/cubic_rlvr.jsonl)")
     rl.add_argument("--train", default="fintech", help="Comma-separated train apps (default: fintech)")
-    rl.add_argument("--eval", dest="eval_apps", default="saas",
-                    help="Comma-separated held-out eval apps (default: saas)")
+    rl.add_argument("--eval", dest="eval_apps", default="saas,agent_gateway",
+                    help="Comma-separated held-out eval apps (default: saas,agent_gateway)")
     rl.add_argument("--runs", type=int, default=3, help="Replays per verification (default: 3)")
     rl.add_argument("--variants", default=None, help="Comma-separated build variants (default: all)")
     rl.add_argument("--no-patches", action="store_true", help="Skip patch-verification trajectories")
@@ -133,10 +140,21 @@ def _cmd_remediate(args: argparse.Namespace) -> int:
     from cubic.gym import ENVIRONMENTS, load_environment
     from cubic.remediate import remediate
 
-    name = args.env if args.env in ENVIRONMENTS else f"{args.env}-compiled"
-    env = load_environment(name)
-    if env.app_source is None and f"{args.env}-compiled" in ENVIRONMENTS:
-        env = load_environment(f"{args.env}-compiled")
+    if args.app:
+        from cubic.compiler import TargetError
+        from cubic.compiler.adapter import external_environment, load_personas
+
+        try:
+            env = external_environment(args.app, load_personas(args.personas) if args.personas else [],
+                                       snapshot=args.snapshot)
+        except TargetError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 2
+    else:
+        name = args.env if args.env in ENVIRONMENTS else f"{args.env}-compiled"
+        env = load_environment(name)
+        if env.app_source is None and f"{args.env}-compiled" in ENVIRONMENTS:
+            env = load_environment(f"{args.env}-compiled")
     report = remediate(env, variant=args.variant, runs=args.runs, out_dir=args.out_dir)
 
     print(f"Cubic remediate: environment={report.environment} variant={report.variant} "
@@ -212,8 +230,12 @@ def _load_personas(path: Path) -> list:
 def _cmd_compile(args: argparse.Namespace) -> int:
     from cubic.compiler import TargetError, compile_app, load_target
 
+    target = args.app_target or args.target
+    if not target:
+        print("error: give a target (positional or --app module:factory)", file=sys.stderr)
+        return 2
     try:
-        factory = load_target(args.target)
+        factory = load_target(target)
     except TargetError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2

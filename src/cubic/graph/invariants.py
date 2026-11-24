@@ -107,6 +107,9 @@ class InvariantAssertion(_Frozen):
     checks: tuple[InvariantCheck, ...] = Field(
         min_length=1, description="All checks must hold for the invariant to hold."
     )
+    tags: tuple[str, ...] = Field(
+        default=(), description="Taxonomy references, e.g. OWASP-API1:2023, OWASP-LLM06:2025, CWE-639."
+    )
 
     @model_validator(mode="after")
     def _unique_edge_refs(self) -> InvariantAssertion:

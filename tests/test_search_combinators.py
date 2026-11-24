@@ -160,7 +160,8 @@ def test_pool_is_deterministic_unique_and_replayable():
     assert pool == generate_pool(G)
     assert len({t.id for t in pool}) == len(pool)
     assert len({(t.invariant_id, t.trace.model_dump_json()) for t in pool}) == len(pool)
-    assert {t.combinator for t in pool} == set(CombinatorKind)
+    # fintech has no tool-reference edges, so the confused-deputy combinator never applies there
+    assert {t.combinator for t in pool} == set(CombinatorKind) - {CombinatorKind.CROSS_TENANT_REFERENCE}
     for test in pool:
         validate_candidate(G, test.to_candidate())
         assert test.edge_id in G.invariant(test.invariant_id).edge_ids

@@ -1,7 +1,7 @@
 """Dataset export: deterministic JSONL, environment-level splits, leakage checks and stats.
 
-Splits are by *application*. By default the ``fintech`` app is train and ``saas`` is
-held-out eval. No prompt, graph or environment appears in more than one split, so
+Splits are by *application*. By default the ``fintech`` app is train, and ``saas`` and
+``agent_gateway`` are held-out eval. No prompt, graph or environment appears in more than one split, so
 eval reward measures cross-domain generalization, not memorization. The export
 fails if any prompt hash is shared between splits.
 
@@ -25,7 +25,7 @@ from typing import Any
 from cubic.rlvr.recorder import TrajectoryRecord, arecord_environment, load_app_environment
 from cubic.rlvr.rewards import REWARDS
 
-DEFAULT_SPLITS: dict[str, tuple[str, ...]] = {"train": ("fintech",), "eval": ("saas",)}
+DEFAULT_SPLITS: dict[str, tuple[str, ...]] = {"train": ("fintech",), "eval": ("saas", "agent_gateway")}
 
 
 class LeakageError(ValueError):

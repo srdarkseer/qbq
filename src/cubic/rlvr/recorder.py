@@ -56,7 +56,9 @@ from cubic.rlvr.rewards import (
 from cubic.search import HeuristicGraphPolicy, Oracle, generate_pool, search
 from cubic.verifier.replay import Verdict
 
-APP_ENVIRONMENTS: dict[str, str] = {"fintech": "fintech-compiled", "saas": "saas-compiled"}
+APP_ENVIRONMENTS: dict[str, str] = {
+    "fintech": "fintech-compiled", "saas": "saas-compiled", "agent_gateway": "agent-gateway-compiled",
+}
 
 
 def load_app_environment(app: str) -> Environment:

@@ -94,9 +94,9 @@ def test_committed_remediation_snapshot_is_consistent():
     data = json.loads(SNAPSHOT.read_text())
     assert data["benchmark"] == "remediation" and data["runs_per_candidate"] == 3
     summary = data["summary"]
-    assert summary["recall_at_1"] == {"fintech": 1.0, "saas": 1.0}
-    assert summary["false_positive_rate"] == {"fintech": 0.0, "saas": 0.0}
-    assert summary["findings_remediated"] == summary["verified_patches"] == 16
+    assert summary["recall_at_1"] == {"fintech": 1.0, "saas": 1.0, "agent_gateway": 1.0}
+    assert summary["false_positive_rate"] == {"fintech": 0.0, "saas": 0.0, "agent_gateway": 0.0}
+    assert summary["findings_remediated"] == summary["verified_patches"] == 24
     assert summary["patch_pass_rate"] == 1.0
     for app in data["apps"].values():
         assert app["remediation"]["totals"]["regression_tests_valid"] == 8

@@ -123,7 +123,7 @@ async def aremediate(
     module = importlib.import_module(source.module)
     factory = getattr(module, source.factory)
     personas = [a.model_copy(update={"observed_state": {}}) for a in env.graph.actors]
-    compiled = await acompile_app(lambda: factory(()), personas=personas)
+    compiled = await acompile_app(lambda: source.build(factory), personas=personas, app_name=env.graph.app_name)
     graph = compiled.graph
     t1 = time.perf_counter()
     timings["compile"] = t1 - t0
@@ -134,7 +134,7 @@ async def aremediate(
     timings["search"] = t2 - t1
 
     def build() -> Any:
-        return factory(active)
+        return source.build(factory, active)
 
     verifier = DeterministicVerifier(graph, build, env.snapshot, runs=runs)
     findings: list[ConfirmedFinding] = []
@@ -180,12 +180,13 @@ async def aremediate(
         name = (export_regression_test(finding, graph, source, out_dir).name if out_dir is not None
                 else f"<memory>/{finding.invariant.id}")
         # the exported test drives its own event loop, so it runs in a worker thread
-        unpatched_ok = await asyncio.to_thread(_run_exported, rendered, factory, (active,))
+        args = source.factory_args(active)
+        unpatched_ok = await asyncio.to_thread(_run_exported, rendered, factory, args)
         check = RegressionCheck(file=name, fails_on_unpatched=not unpatched_ok)
         if record.verified_patch is not None:
             with patched_module(record.verified_patch, source) as fixed:
                 check.passes_on_patched = await asyncio.to_thread(
-                    _run_exported, rendered, getattr(fixed, source.factory), (active,))
+                    _run_exported, rendered, getattr(fixed, source.factory), args)
         record.regression_test = check
     t5 = time.perf_counter()
     timings["export"] = t5 - t4

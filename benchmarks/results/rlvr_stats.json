@@ -11,13 +11,14 @@
     "patch_rejected": -1.0
   },
   "runs_per_verification": 3,
-  "rows": 1427,
-  "sha256": "f72c40cf98c64f897ab002278f99f651cfd648de5ac5c42c014797a318dd6441",
+  "rows": 2155,
+  "sha256": "aa1cd0e06377cab8ee3382c5b6913ec6ca9093db153947ad6c26a970916ea976",
   "leakage": {
     "shared_prompts": 0,
     "shared_envs": [],
     "envs_by_split": {
       "eval": [
+        "agent_gateway",
         "saas"
       ],
       "train": [
@@ -28,39 +29,40 @@
   "splits": {
     "eval": {
       "envs": [
+        "agent_gateway",
         "saas"
       ],
-      "rows": 597,
-      "prompts": 35,
+      "rows": 1289,
+      "prompts": 71,
       "by_task": {
-        "patch/rule_patch": 10,
-        "patch/synthetic_patch": 16,
-        "test/malformed": 31,
-        "test/pool": 540
+        "patch/rule_patch": 18,
+        "patch/synthetic_patch": 32,
+        "test/malformed": 63,
+        "test/pool": 1176
       },
       "by_outcome": {
-        "false_positive": 34,
-        "holds": 488,
-        "malformed": 31,
-        "patch_rejected": 16,
-        "patch_verified": 10,
-        "true_violation": 18
+        "false_positive": 86,
+        "holds": 1054,
+        "malformed": 63,
+        "patch_rejected": 32,
+        "patch_verified": 18,
+        "true_violation": 36
       },
       "reward_histogram": {
-        "-1.0": 81,
-        "+0.0": 488,
-        "+1.0": 28
+        "-1.0": 181,
+        "+0.0": 1054,
+        "+1.0": 54
       },
-      "mean_reward": -0.088777,
-      "pool_mean_reward": -0.02963,
-      "search_plan_mean_reward": 0.044444,
-      "policy_pruned_mean_reward": -0.226667,
+      "mean_reward": -0.098526,
+      "pool_mean_reward": -0.042517,
+      "search_plan_mean_reward": 0.043011,
+      "policy_pruned_mean_reward": -0.22043,
       "by_oracle_mean_reward": {
-        "conservation": 0.083333,
-        "forbidden": -0.041667,
-        "rejected_input": 0.166667,
+        "conservation": 0.055556,
+        "forbidden": -0.017544,
+        "rejected_input": -0.083333,
         "rejected_transition": -0.333333,
-        "success": -0.121212,
+        "success": -0.098485,
         "unauthenticated": 0.0
       }
     },
@@ -68,17 +70,17 @@
       "envs": [
         "fintech"
       ],
-      "rows": 830,
+      "rows": 866,
       "prompts": 28,
       "by_task": {
         "patch/rule_patch": 10,
         "patch/synthetic_patch": 16,
         "test/malformed": 24,
-        "test/pool": 780
+        "test/pool": 816
       },
       "by_outcome": {
         "false_positive": 88,
-        "holds": 658,
+        "holds": 694,
         "malformed": 24,
         "patch_rejected": 16,
         "patch_verified": 10,
@@ -86,17 +88,17 @@
       },
       "reward_histogram": {
         "-1.0": 128,
-        "+0.0": 658,
+        "+0.0": 694,
         "+1.0": 44
       },
-      "mean_reward": -0.101205,
-      "pool_mean_reward": -0.069231,
+      "mean_reward": -0.096998,
+      "pool_mean_reward": -0.066176,
       "search_plan_mean_reward": 0.066667,
-      "policy_pruned_mean_reward": -0.505747,
+      "policy_pruned_mean_reward": -0.376068,
       "by_oracle_mean_reward": {
         "conservation": 0.095238,
         "forbidden": -0.043478,
-        "rejected_input": -0.071429,
+        "rejected_input": -0.064516,
         "rejected_transition": 0.333333,
         "success": -0.236111,
         "unauthenticated": 0.0
@@ -107,6 +109,6 @@
     "path": "datasets/cubic_rlvr_sample.jsonl",
     "rows": 24,
     "per_stratum": 2,
-    "sha256": "83b39d43762ffa0dea6dd63765e900783d417454328778050de54fc84c2b89d0"
+    "sha256": "179d3ea9dfd19bb56968dfbd70865464f12b064bd47d03791d8858396c7cc44b"
   }
 }

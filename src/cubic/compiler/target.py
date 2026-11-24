@@ -43,6 +43,13 @@ def _module_for_path(path: Path) -> Any:
     return module
 
 
+def ensure_cwd_importable() -> None:
+    """Make ``pkg.module`` targets in the working directory importable from the console script."""
+    cwd = str(Path.cwd())
+    if cwd not in sys.path:
+        sys.path.insert(0, cwd)
+
+
 def load_target(spec: str) -> Callable[[], Any]:
     """Return a zero-argument factory producing a fresh ASGI app.
 
@@ -57,6 +64,7 @@ def load_target(spec: str) -> Callable[[], Any]:
             raise TargetError(f"no such file: {location}")
         module = _module_for_path(path)
     else:
+        ensure_cwd_importable()
         try:
             module = importlib.import_module(location)
         except ImportError as exc:

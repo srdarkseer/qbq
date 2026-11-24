@@ -85,10 +85,17 @@ def ledger_readiness(graph: StateGraph, edge: TransitionEdge, step: ActionStep) 
     if not checks:
         return Fact(Readiness.UNKNOWN, "no ledger invariant")
     amount = _amount(step)
-    accounts = [
-        (b, c) for b in bound_records(graph, edge, step) for c in checks
-        if b.owner_id == step.actor_id and _singular(b.entity_key) == _singular(c.entity)
-    ]
+    own = [b for b in bound_records(graph, edge, step) if b.owner_id == step.actor_id]
+    accounts = [(b, c) for b in own for c in checks if _singular(b.entity_key) == _singular(c.entity)]
+    if not accounts:  # follow one reference hop, e.g. agent.tenant_id -> tenants[tenant_id]
+        actor = graph.actor(step.actor_id)
+        for bound in own:
+            for check in checks:
+                rid = bound.record.get(check.account_field)
+                record = actor.observed(check.entity, rid) if isinstance(rid, str) else None
+                if record is not None:
+                    accounts.append((BoundRecord(check.account_field, _singular(check.entity), rid,
+                                                 actor.id, check.entity, record), check))
     if not accounts:
         return Fact(Readiness.UNKNOWN, "no observed account bound by the actor")
     for bound, check in accounts:

@@ -3,17 +3,19 @@
   "cubic_version": "0.1.0",
   "runs_per_candidate": 3,
   "summary": {
-    "apps": 2,
+    "apps": 3,
     "recall_at_1": {
       "fintech": 1.0,
-      "saas": 1.0
+      "saas": 1.0,
+      "agent_gateway": 1.0
     },
     "false_positive_rate": {
       "fintech": 0.0,
-      "saas": 0.0
+      "saas": 0.0,
+      "agent_gateway": 0.0
     },
-    "findings_remediated": 16,
-    "verified_patches": 16,
+    "findings_remediated": 24,
+    "verified_patches": 24,
     "patch_pass_rate": 1.0
   },
   "apps": {
@@ -350,6 +352,171 @@
           }
         }
       }
+    },
+    "agent_gateway": {
+      "environment": "agent-gateway-compiled",
+      "plan_tests": 32,
+      "invariants_covered": 32,
+      "graph": {
+        "nodes": 8,
+        "edges": 10,
+        "invariants": 33
+      },
+      "detection": {
+        "grounded": {
+          "recall_at_1": 1.0,
+          "bugs_found_at_1": 8,
+          "bugs_total": 8,
+          "false_positive_rate": 0.0,
+          "false_positives": 0,
+          "negatives": 184,
+          "flaky": 0
+        },
+        "ungrounded_m3_policy": {
+          "recall_at_1": 1.0,
+          "bugs_found_at_1": 8,
+          "bugs_total": 8,
+          "false_positive_rate": 0.0,
+          "false_positives": 0,
+          "negatives": 172,
+          "flaky": 0
+        }
+      },
+      "remediation": {
+        "totals": {
+          "findings": 8,
+          "verified_patches": 8,
+          "regression_tests_valid": 8,
+          "patch_pass_rate": 1.0
+        },
+        "rules": {
+          "rule:bypassed_guard": 8
+        },
+        "by_variant": {
+          "only:cross_tenant_conversation_read": {
+            "findings": 1,
+            "verified_patches": 1,
+            "patch_pass_rate": 1.0,
+            "first_attempt_pass": 1,
+            "patch_attempts": 1,
+            "regression_tests_valid": 1,
+            "fixes": {
+              "inv.tenant.read_conversation": {
+                "oracle": "forbidden",
+                "rule": "rule:bypassed_guard",
+                "source": "cubic/gym/agent_gateway/app.py:230",
+                "exploit_violations_after": 0,
+                "functional_checks": 10,
+                "regressions": [],
+                "diff_lines": 7
+              }
+            }
+          },
+          "only:cross_tenant_tool_invocation": {
+            "findings": 1,
+            "verified_patches": 1,
+            "patch_pass_rate": 1.0,
+            "first_attempt_pass": 1,
+            "patch_attempts": 1,
+            "regression_tests_valid": 1,
+            "fixes": {
+              "inv.tool_authz.create_tool_call": {
+                "oracle": "forbidden",
+                "rule": "rule:bypassed_guard",
+                "source": "cubic/gym/agent_gateway/app.py:222",
+                "exploit_violations_after": 0,
+                "functional_checks": 10,
+                "regressions": [],
+                "diff_lines": 2
+              }
+            }
+          },
+          "only:unbounded_max_tokens": {
+            "findings": 1,
+            "verified_patches": 1,
+            "patch_pass_rate": 1.0,
+            "first_attempt_pass": 1,
+            "patch_attempts": 1,
+            "regression_tests_valid": 1,
+            "fixes": {
+              "inv.ai_bounds.create_completion.max_tokens": {
+                "oracle": "rejected_input",
+                "rule": "rule:bypassed_guard",
+                "source": "cubic/gym/agent_gateway/app.py:206",
+                "exploit_violations_after": 0,
+                "functional_checks": 10,
+                "regressions": [],
+                "diff_lines": 2
+              }
+            }
+          },
+          "only:approval_skip": {
+            "findings": 1,
+            "verified_patches": 1,
+            "patch_pass_rate": 1.0,
+            "first_attempt_pass": 1,
+            "patch_attempts": 1,
+            "regression_tests_valid": 1,
+            "fixes": {
+              "inv.lifecycle.execute_action": {
+                "oracle": "rejected_transition",
+                "rule": "rule:bypassed_guard",
+                "source": "cubic/gym/agent_gateway/app.py:264",
+                "exploit_violations_after": 0,
+                "functional_checks": 10,
+                "regressions": [],
+                "diff_lines": 2
+              }
+            }
+          },
+          "vulnerable": {
+            "findings": 4,
+            "verified_patches": 4,
+            "patch_pass_rate": 1.0,
+            "first_attempt_pass": 4,
+            "patch_attempts": 4,
+            "regression_tests_valid": 4,
+            "fixes": {
+              "inv.ai_bounds.create_completion.max_tokens": {
+                "oracle": "rejected_input",
+                "rule": "rule:bypassed_guard",
+                "source": "cubic/gym/agent_gateway/app.py:206",
+                "exploit_violations_after": 0,
+                "functional_checks": 10,
+                "regressions": [],
+                "diff_lines": 2
+              },
+              "inv.lifecycle.execute_action": {
+                "oracle": "rejected_transition",
+                "rule": "rule:bypassed_guard",
+                "source": "cubic/gym/agent_gateway/app.py:264",
+                "exploit_violations_after": 0,
+                "functional_checks": 10,
+                "regressions": [],
+                "diff_lines": 2
+              },
+              "inv.tool_authz.create_tool_call": {
+                "oracle": "forbidden",
+                "rule": "rule:bypassed_guard",
+                "source": "cubic/gym/agent_gateway/app.py:222",
+                "exploit_violations_after": 0,
+                "functional_checks": 10,
+                "regressions": [],
+                "diff_lines": 2
+              },
+              "inv.tenant.read_conversation": {
+                "oracle": "forbidden",
+                "rule": "rule:bypassed_guard",
+                "source": "cubic/gym/agent_gateway/app.py:230",
+                "exploit_violations_after": 0,
+                "functional_checks": 10,
+                "regressions": [],
+                "diff_lines": 7
+              }
+            }
+          }
+        }
+      }
     }
   },
   "latency_s": {
@@ -357,22 +524,30 @@
     "python": "3.11.9",
     "remediate_vulnerable": {
       "fintech": {
-        "compile": 0.0316,
-        "search": 0.0043,
-        "verify": 0.2454,
-        "patch_and_verify": 0.7931,
-        "export": 0.4076,
-        "total": 1.482
+        "compile": 0.0334,
+        "search": 0.0055,
+        "verify": 0.2872,
+        "patch_and_verify": 0.7649,
+        "export": 0.4042,
+        "total": 1.4952
       },
       "saas": {
-        "compile": 0.0509,
-        "search": 0.0031,
-        "verify": 0.4313,
-        "patch_and_verify": 1.141,
-        "export": 0.4148,
-        "total": 2.0411
+        "compile": 0.0575,
+        "search": 0.0034,
+        "verify": 0.4643,
+        "patch_and_verify": 1.1868,
+        "export": 0.3913,
+        "total": 2.1033
+      },
+      "agent_gateway": {
+        "compile": 0.0803,
+        "search": 0.005,
+        "verify": 0.6766,
+        "patch_and_verify": 0.7425,
+        "export": 0.0803,
+        "total": 1.5847
       }
     },
-    "benchmark_total": 23.22
+    "benchmark_total": 36.87
   }
 }

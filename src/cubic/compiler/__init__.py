@@ -13,7 +13,7 @@ from cubic.compiler.static import (
     analyze_sources,
     extract_candidates,
 )
-from cubic.compiler.target import TargetError, load_target
+from cubic.compiler.target import TargetError, ensure_cwd_importable, load_target
 
 __all__ = [
     "CompileReport",
@@ -33,6 +33,7 @@ __all__ = [
     "build_graph",
     "compare_graphs",
     "compile_app",
+    "ensure_cwd_importable",
     "extract_candidates",
     "introspect",
     "load_target",

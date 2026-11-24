@@ -1,4 +1,4 @@
-"""Closed-loop remediation benchmark across both Bug Gym apps (fintech and SaaS).
+"""Closed-loop remediation benchmark across the Bug Gym apps (fintech, SaaS, agent gateway).
 
     uv run python benchmarks/remediation_bench.py [--runs 3] [--out benchmarks/results/remediation_bench.json]
 
@@ -36,7 +36,7 @@ from cubic.gym.base import Environment
 from cubic.remediate import RemediationReport, aremediate
 from cubic.search import HeuristicGraphPolicy
 
-APPS = {"fintech": "fintech-compiled", "saas": "saas-compiled"}
+APPS = {"fintech": "fintech-compiled", "saas": "saas-compiled", "agent_gateway": "agent-gateway-compiled"}
 
 
 def _detection(report) -> dict:

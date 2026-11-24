@@ -39,7 +39,7 @@ from pydantic import BaseModel, ConfigDict
 from cubic.gym.base import AppSource
 from cubic.remediate.models import ConfirmedFinding, PatchCandidate
 from cubic.search.combinators import Oracle
-from cubic.search.policy import mentions_field
+from cubic.search.policy import bound_direction, mentions_field
 
 FunctionNode = ast.FunctionDef | ast.AsyncFunctionDef
 
@@ -290,6 +290,8 @@ class RulePatcher:
     # -- rules ------------------------------------------------------------------
 
     def _schema_lower_bound(self, finding: ConfirmedFinding, ctx: SourceContext) -> PatchCandidate | None:
+        if bound_direction(finding.invariant) == "upper":
+            return None  # the invariant is about values that are too large; gt=0 would not help
         for model in ctx.body_models:
             for stmt in model.body:
                 if not (isinstance(stmt, ast.AnnAssign) and isinstance(stmt.target, ast.Name)):

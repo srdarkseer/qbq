@@ -33,13 +33,26 @@ class Variant:
 class AppSource:
     """Where an environment's application code lives, for patching and test export.
 
-    ``module`` must expose ``factory(active_bugs)`` returning an ASGI app and
-    ``snapshot(app)`` returning a ``DbSnapshot``.
+    ``module`` must expose ``factory`` returning a fresh ASGI app: ``factory(active_bugs)``
+    for Bug Gym apps, or plain ``factory()`` for third-party apps
+    (``accepts_flags=False``). ``snapshot(app)`` returns a ``DbSnapshot``. When
+    ``snapshot`` is None, the app has no state hook and state-based checks see an
+    empty database.
     """
 
     module: str
     factory: str = "create_app"
-    snapshot: str = "snapshot"
+    snapshot: str | None = "snapshot"
+    accepts_flags: bool = True
+
+    def build(self, factory: Callable[..., Any], active_bugs: frozenset[str] = frozenset()) -> Any:
+        return factory(active_bugs) if self.accepts_flags else factory()
+
+    def factory_args(self, active_bugs: frozenset[str]) -> tuple:
+        return (active_bugs,) if self.accepts_flags else ()
+
+    def snapshotter(self, module: Any) -> Callable[[Any], DbSnapshot]:
+        return getattr(module, self.snapshot) if self.snapshot else (lambda app: DbSnapshot())
 
 
 @dataclass(frozen=True)

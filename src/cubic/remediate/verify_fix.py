@@ -100,10 +100,10 @@ async def averify_fix(
     try:
         with patched_module(patch, app_source) as module:
             build = getattr(module, app_source.factory)
-            snapshot = getattr(module, app_source.snapshot)
+            snapshot = app_source.snapshotter(module)
 
             def factory() -> Any:
-                return build(active_bugs)
+                return app_source.build(build, active_bugs)
 
             factory()  # fail fast if the patched app does not build
             exploit = await DeterministicVerifier(graph, factory, snapshot, runs=runs).averify(finding.candidate)

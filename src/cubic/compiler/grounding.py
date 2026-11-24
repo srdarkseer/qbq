@@ -29,7 +29,12 @@ from cubic.search.combinators import _entity_matches, resource_stem
 
 AppFactory = Callable[[], Any]
 _BASE_URL = "http://cubic-ground"
-_SECRET_FIELD = re.compile(r"(secret|token|password|passwd|hash|credential|private)", re.IGNORECASE)
+# credential-like *names* (``api_token``, ``password_hash``, ``client_secret``), not every field
+# containing the substring: ``token_balance`` and ``max_tokens_limit`` are state, not secrets.
+_SECRET_FIELD = re.compile(
+    r"(^|_)(secret|token|password|passwd|hash|salt|credentials?|private_key|api_key|apikey|bearer)$",
+    re.IGNORECASE,
+)
 _SCALARS = (str, int, float, bool, type(None))
 
 

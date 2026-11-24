@@ -18,6 +18,9 @@ Combinators
                            earlier state, skipping prerequisite edges.
 ``boundary_perturb``       substitute boundary values into typed payload fields
                            (input validation) or send the nominal request (functional).
+``cross_tenant_reference`` keep the caller's credentials and own path resources, but point
+                           one body reference (``tool_id``...) at another tenant's resource
+                           (confused deputy: cross-tenant tool invocation and the like).
 """
 
 from __future__ import annotations
@@ -46,6 +49,7 @@ from cubic.verifier.trace import ActionStep, ActionTrace, CandidateFinding
 MUTATING_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 CONTENTION_LEVELS: tuple[int, ...] = (8, 16)
 _WRONG_TYPE = "not-a-number"
+HUGE_VALUE = 1_000_000_000  # "above any sane bound" for fields that declare no maximum
 _MISSING = object()  # boundary sentinel: remove the field from the body
 
 
@@ -61,7 +65,7 @@ class Oracle(StrEnum):
 
     UNAUTHENTICATED = "unauthenticated"          # status in {401}
     FORBIDDEN = "forbidden"                      # status in {403, 404}
-    REJECTED_INPUT = "rejected_input"            # status in {400, 422}
+    REJECTED_INPUT = "rejected_input"            # status in {400, 413, 422}
     REJECTED_TRANSITION = "rejected_transition"  # any 4xx including 409
     SUCCESS = "success"                          # 2xx only
     CONSERVATION = "conservation"                # ledger reconciliation
@@ -80,7 +84,7 @@ def classify_invariant(invariant: InvariantAssertion) -> Oracle:
             return Oracle.UNAUTHENTICATED
         if allowed <= {403, 404}:
             return Oracle.FORBIDDEN
-        if allowed <= {400, 422}:
+        if allowed <= {400, 413, 422}:
             return Oracle.REJECTED_INPUT
         if all(400 <= s < 500 for s in allowed) and 409 in allowed:
             return Oracle.REJECTED_TRANSITION
@@ -107,6 +111,7 @@ class CombinatorKind(StrEnum):
     PARALLEL_CONTENTION = "parallel_contention"
     LIFECYCLE_ORDER = "lifecycle_order"
     BOUNDARY_PERTURB = "boundary_perturb"
+    CROSS_TENANT_REFERENCE = "cross_tenant_reference"
 
 
 class BoundaryCase(StrEnum):
@@ -117,6 +122,7 @@ class BoundaryCase(StrEnum):
     ZERO = "zero"
     BELOW_MIN = "below_min"
     ABOVE_MAX = "above_max"
+    HUGE = "huge"
     MISSING = "missing"
     EMPTY = "empty"
     WRONG_TYPE = "wrong_type"
@@ -133,6 +139,7 @@ COMBINATOR_ORACLES: dict[CombinatorKind, frozenset[Oracle]] = {
     CombinatorKind.PARALLEL_CONTENTION: frozenset({Oracle.CONSERVATION}),
     CombinatorKind.LIFECYCLE_ORDER: frozenset({Oracle.REJECTED_TRANSITION, Oracle.STATE_GUARD}),
     CombinatorKind.BOUNDARY_PERTURB: frozenset({Oracle.REJECTED_INPUT, Oracle.SUCCESS}),
+    CombinatorKind.CROSS_TENANT_REFERENCE: frozenset({Oracle.FORBIDDEN}),
 }
 
 
@@ -284,9 +291,9 @@ def _nominal_body(
 ) -> dict[str, Any] | None:
     """A schema-valid body for ``actor``.
 
-    The first ``*_id`` field gets one of the actor's own resources. Each later
-    ``*_id`` field gets a different resource of the same kind, normally a peer's
-    resource, as needed for a transfer destination.
+    Each ``*_id`` field gets one of the actor's own, not yet used resources of that kind.
+    When the actor has none left (a second wallet field, as in a transfer destination),
+    it gets another persona's resource instead.
     """
     if edge.payload_schema is None:
         return None
@@ -302,9 +309,9 @@ def _nominal_body(
             body[name] = True
         elif kind == "string" and (stem := resource_stem(name)) is not None:
             own = [r for r in owned_ids(actor, stem, edge) if r not in used]
-            pool = own if not used else [
-                rid for _, rid in all_resources(graph, stem, edge) if rid not in used
-            ]
+            kind = [rid for _, rid in all_resources(graph, stem, edge)]
+            same_kind_used = any(v in kind for v in body.values())  # e.g. from_wallet_id already set
+            pool = own or ([rid for rid in kind if rid not in used] if same_kind_used else [])
             if not pool:
                 if name in _required(edge):
                     return {"__unbindable__": name}
@@ -551,6 +558,8 @@ def boundary_values(prop: dict[str, Any], required: bool) -> dict[BoundaryCase, 
         if (top := _max_valid(prop)) is not None:
             out[BoundaryCase.MAX_VALID] = top
             out[BoundaryCase.ABOVE_MAX] = top + 1
+        else:
+            out[BoundaryCase.HUGE] = HUGE_VALUE
         out[BoundaryCase.WRONG_TYPE] = _WRONG_TYPE
     elif kind == "string":
         out[BoundaryCase.EMPTY] = ""
@@ -613,6 +622,47 @@ def boundary_perturb(
                  features, actor.id, field or "", case.value)
 
 
+def body_reference_fields(edge: TransitionEdge) -> tuple[str, ...]:
+    return tuple(n for n, p in _properties(edge).items()
+                 if p.get("type") == "string" and resource_stem(n) is not None)
+
+
+def cross_tenant_reference(
+    graph: StateGraph, edge: TransitionEdge, invariant: InvariantAssertion,
+    actor: ActorPersona, field: str, foreign: ActorPersona,
+) -> ProposedTest | None:
+    """``actor``'s nominal request, with ``field`` pointing at a resource ``foreign`` owns.
+
+    Only fields the nominal request bound to the actor's *own* resources are
+    swapped. Fields that legitimately reference others, such as a transfer
+    destination, are left alone.
+    """
+    if foreign.id == actor.id:
+        return None
+    nominal = nominal_step(graph, edge, actor)
+    if nominal is None or nominal.body is None or field not in nominal.body:
+        return None
+    stem = resource_stem(field) or ""
+    original = nominal.body[field]
+    if original not in owned_ids(actor, stem, edge):
+        return None
+    taken = set(nominal.body.values()) | set(owned_ids(actor, stem, edge))
+    choices = [r for r in owned_ids(foreign, stem, edge) if r not in taken]
+    if not choices:
+        return None
+    body = {**nominal.body, field: choices[0]}
+    features = {
+        "actor": actor.id, "actor_role": actor.role, "field": field, "foreign_owner": foreign.id,
+        "foreign_resource": choices[0], "original_resource": original, "resources": dict(nominal.path_params),
+    }
+    hypothesis = (
+        f"{edge.method.value} {edge.path} as {actor.id} with {field}={choices[0]!r} "
+        f"(owned by {foreign.id}); expect {invariant.id} to break."
+    )
+    return _make(CombinatorKind.CROSS_TENANT_REFERENCE, graph, edge, invariant,
+                 [nominal.model_copy(update={"body": body})], hypothesis, features, actor.id, field, foreign.id)
+
+
 # --------------------------------------------------------------------------- enumeration
 
 
@@ -650,6 +700,11 @@ def _expand(
     elif kind is CombinatorKind.LIFECYCLE_ORDER:
         for actor in actors:
             yield lifecycle_order_check(graph, edge, invariant, actor)
+    elif kind is CombinatorKind.CROSS_TENANT_REFERENCE:
+        for actor in actors:
+            for field in body_reference_fields(edge):
+                for foreign in actors:
+                    yield cross_tenant_reference(graph, edge, invariant, actor, field, foreign)
     elif kind is CombinatorKind.BOUNDARY_PERTURB:
         props = _properties(edge)
         for actor in actors:

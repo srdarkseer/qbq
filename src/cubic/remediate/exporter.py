@@ -114,6 +114,8 @@ def _assert_invariant(statuses, state):
             got = statuses[check["step"]]
             bad = sorted({{s for s in got if s not in check["allowed"]}})
             assert not bad, f"step {{check['step']}} returned {{bad}}, allowed {{check['allowed']}}"
+        elif state is None:
+            continue  # the app exposes no state hook: only status checks apply
         elif check["kind"] == "ledger_conservation":
             accounts = state.entities.get(check["entity"], {{}})
             for account_id in check["account_ids"] or sorted(accounts):
@@ -139,7 +141,7 @@ def {test_name}(run):
 
 def render_regression_test(finding: ConfirmedFinding, graph: StateGraph, app_source: AppSource) -> str:
     checks = _checks(finding)
-    needs_state = any(c["kind"] != "status_code" for c in checks)
+    needs_state = any(c["kind"] != "status_code" for c in checks) and app_source.snapshot is not None
     name = regression_file_name(finding.invariant.id).removesuffix(".py")
     return _TEMPLATE.format(
         invariant_id=finding.invariant.id, category=finding.invariant.category.value,

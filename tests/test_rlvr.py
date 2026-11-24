@@ -137,7 +137,7 @@ def test_cli_export_rlvr_small(tmp_path, capsys):
                  "--no-patches", "--sample-out", str(sample), "--stats", str(stats)])
     assert code == 0
     data = json.loads(stats.read_text())
-    assert data["leakage"]["envs_by_split"] == {"eval": ["saas"], "train": ["fintech"]}
+    assert data["leakage"]["envs_by_split"] == {"eval": ["agent_gateway", "saas"], "train": ["fintech"]}
     assert data["rows"] == len(out.read_text().splitlines())
     assert data["sample"]["rows"] == len(sample.read_text().splitlines())
     assert "trajectories" in capsys.readouterr().out

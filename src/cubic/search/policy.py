@@ -46,6 +46,7 @@ from cubic.search.combinators import (
     ProposedTest,
     _numeric_bounds,
     _properties,
+    body_reference_fields,
     classify_invariant,
     initial_state_node,
     prerequisite_path,
@@ -116,6 +117,7 @@ ORACLE_FIT: dict[tuple[CombinatorKind, Oracle], float] = {
     (CombinatorKind.LIFECYCLE_ORDER, Oracle.STATE_GUARD): 1.0,
     (CombinatorKind.BOUNDARY_PERTURB, Oracle.REJECTED_INPUT): 1.0,
     (CombinatorKind.BOUNDARY_PERTURB, Oracle.SUCCESS): 0.6,
+    (CombinatorKind.CROSS_TENANT_REFERENCE, Oracle.FORBIDDEN): 1.0,
 }
 
 UNCOVERED_BONUS = 2.0
@@ -133,6 +135,16 @@ _BOUNDED_CASES = {
     BoundaryCase.EMPTY: 0.2,
 }
 _VALID_CASES = {BoundaryCase.NOMINAL: 1.0, BoundaryCase.MIN_VALID: 1.0, BoundaryCase.MAX_VALID: 0.6}
+_UPPER_CASES = {BoundaryCase.HUGE: 1.0, BoundaryCase.ABOVE_MAX: 1.0, BoundaryCase.WRONG_TYPE: 0.3,
+                BoundaryCase.MISSING: 0.3}
+_LOWER_ONLY = frozenset({BoundaryCase.NEGATIVE, BoundaryCase.ZERO, BoundaryCase.BELOW_MIN, BoundaryCase.EMPTY})
+_UPPER_ONLY = frozenset({BoundaryCase.HUGE, BoundaryCase.ABOVE_MAX})
+_UPPER_WORDS = re.compile(r"\b(above|upper|exceed\w*)\b", re.IGNORECASE)
+
+
+def bound_direction(invariant: InvariantAssertion) -> str:
+    """``"upper"`` for invariants about values that are too large, else ``"lower"``."""
+    return "upper" if _UPPER_WORDS.search(invariant.description) else "lower"
 
 
 def _guards(edge: TransitionEdge) -> dict[str, Any]:
@@ -146,9 +158,20 @@ def mentions_field(invariant: InvariantAssertion, field: str) -> bool:
     return re.search(rf"(?<![A-Za-z0-9_]){re.escape(field)}(?![A-Za-z0-9_])", invariant.description) is not None
 
 
+def mentions_outside_path(invariant: InvariantAssertion, edge: TransitionEdge, field: str) -> bool:
+    """Like ``mentions_field``, ignoring the edge's own path template in the description."""
+    stripped = invariant.model_copy(update={"description": invariant.description.replace(edge.path, "")})
+    return mentions_field(stripped, field)
+
+
 def _lacks_lower_bound(edge: TransitionEdge, field: str) -> bool:
     prop = _properties(edge).get(field) or {}
     return prop.get("type") in {"integer", "number"} and _numeric_bounds(prop)[0] is None
+
+
+def _lacks_upper_bound(edge: TransitionEdge, field: str) -> bool:
+    prop = _properties(edge).get(field) or {}
+    return prop.get("type") in {"integer", "number"} and _numeric_bounds(prop)[2] is None
 
 
 def _conservation_entities(graph: StateGraph) -> set[str]:
@@ -229,7 +252,8 @@ class HeuristicGraphPolicy:
             return 0.0 if observed == 401 else 1.0  # compile-time probe already saw it hold
         if oracle is Oracle.REJECTED_INPUT:
             fields = [f for f in _properties(edge) if mentions_field(invariant, f)]
-            return 1.5 if any(_lacks_lower_bound(edge, f) for f in fields) else 0.2
+            lacks = _lacks_upper_bound if bound_direction(invariant) == "upper" else _lacks_lower_bound
+            return 1.5 if any(lacks(edge, f) for f in fields) else 0.2
         if oracle is Oracle.CONSERVATION:
             score = 0.5 if edge.metadata.get("writes_ledger") else 0.0
             score += 0.5 if _binds_ledger_account(graph, edge) else 0.0
@@ -266,6 +290,18 @@ class HeuristicGraphPolicy:
                 )
             if f.get("control_step"):
                 score += 0.1
+            named_refs = [r for r in body_reference_fields(edge) if mentions_outside_path(invariant, edge, r)]
+            if pruned is None and named_refs and not any(
+                mentions_outside_path(invariant, edge, p) for p in f["resources"]
+            ):
+                pruned = (f"{invariant.id} concerns body reference {named_refs[0]!r}, not the "
+                          f"path resources a credential swap exercises")
+
+        elif test.combinator is CombinatorKind.CROSS_TENANT_REFERENCE:
+            if not mentions_field(invariant, f["field"]):
+                pruned = f"{invariant.id} does not reference field {f['field']!r}"
+            else:
+                score, why = 1.0, [f"foreign {f['field']} owned by {f['foreign_owner']}"]
 
         elif test.combinator is CombinatorKind.PARALLEL_CONTENTION:
             score = 0.5
@@ -313,10 +349,16 @@ class HeuristicGraphPolicy:
                 score = _VALID_CASES.get(case, 0.0)
             else:
                 field = f["field"]
+                direction = bound_direction(invariant)
                 if field is None or not mentions_field(invariant, field):
                     pruned = f"{invariant.id} does not reference field {field!r}"
+                elif case in (_LOWER_ONLY if direction == "upper" else _UPPER_ONLY):
+                    pruned = f"{case.value} does not probe the {direction} bound {invariant.id} constrains"
                 else:
-                    table = _UNBOUNDED_CASES if _lacks_lower_bound(edge, field) else _BOUNDED_CASES
+                    if direction == "upper":
+                        table = _UPPER_CASES
+                    else:
+                        table = _UNBOUNDED_CASES if _lacks_lower_bound(edge, field) else _BOUNDED_CASES
                     score = table.get(case, 0.1)
                     why.append(f"{case.value} on referenced field {field}")
 

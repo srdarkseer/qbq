@@ -18,9 +18,9 @@
     "invariants": 23
   },
   "pool": {
-    "size": 130,
+    "size": 136,
     "by_combinator": {
-      "boundary_perturb": 80,
+      "boundary_perturb": 86,
       "cross_persona": 35,
       "lifecycle_order": 1,
       "parallel_contention": 14
@@ -64,12 +64,12 @@
     },
     "stats": {
       "nodes_expanded": 6,
-      "frames_total": 25,
+      "frames_total": 29,
       "frames_expanded": 23,
       "frames_rescored": 0,
-      "tests_generated": 122,
-      "tests_pruned": 27,
-      "tests_beam_dropped": 47,
+      "tests_generated": 128,
+      "tests_pruned": 37,
+      "tests_beam_dropped": 43,
       "tests_emitted": 20
     }
   },
@@ -99,26 +99,26 @@
       }
     },
     "full_pool_no_policy": {
-      "proposals": 130,
-      "variant_proposal_pairs": 780,
-      "pairs_targeting_broken_invariant": 96,
-      "pairs_targeting_intact_invariant": 684,
+      "proposals": 136,
+      "variant_proposal_pairs": 816,
+      "pairs_targeting_broken_invariant": 102,
+      "pairs_targeting_intact_invariant": 714,
       "unfiltered": {
-        "reported_findings": 780,
-        "true_positives": 96,
-        "false_positives": 684,
-        "precision": 0.123077,
+        "reported_findings": 816,
+        "true_positives": 102,
+        "false_positives": 714,
+        "precision": 0.125,
         "false_positive_rate": 1.0,
-        "false_discovery_rate": 0.876923
+        "false_discovery_rate": 0.875
       },
       "verifier_gated": {
         "reported_findings": 122,
         "true_positives": 52,
         "false_positives": 70,
         "precision": 0.42623,
-        "false_positive_rate": 0.102339,
+        "false_positive_rate": 0.098039,
         "false_discovery_rate": 0.57377,
-        "filtered_out": 658,
+        "filtered_out": 694,
         "flaky_discarded": 0
       }
     }
@@ -143,24 +143,24 @@
       "seeds": 200,
       "budget": 20,
       "recall_at_1": {
-        "mean": 0.43,
+        "mean": 0.435,
         "median": 0.5,
         "min": 0.0,
         "max": 1.0
       },
       "runs_with_full_recall_at_1": 4,
       "false_positive_rate_gated": {
-        "mean": 0.11413,
-        "median": 0.107143,
+        "mean": 0.109221,
+        "median": 0.09434,
         "min": 0.0,
-        "max": 0.290909
+        "max": 0.27451
       },
       "runs_with_any_false_positive": 192,
       "tests_to_full_recall_vulnerable": {
-        "mean": 47.635,
-        "median": 43.0,
-        "min": 13,
-        "max": 106
+        "mean": 51.415,
+        "median": 49.0,
+        "min": 10,
+        "max": 113
       }
     }
   }
