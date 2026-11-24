@@ -60,6 +60,19 @@ def build_parser() -> argparse.ArgumentParser:
     re_.add_argument("--require-verified", action="store_true",
                      help="Exit non-zero unless every finding has a verified patch")
 
+    rl = sub.add_parser("export-rlvr", help="Export verifiable-reward trajectories (JSONL) for GRPO/RLVR training")
+    rl.add_argument("--out", type=Path, default=Path("datasets/cubic_rlvr.jsonl"),
+                    help="Full dataset path (default: datasets/cubic_rlvr.jsonl)")
+    rl.add_argument("--train", default="fintech", help="Comma-separated train apps (default: fintech)")
+    rl.add_argument("--eval", dest="eval_apps", default="saas",
+                    help="Comma-separated held-out eval apps (default: saas)")
+    rl.add_argument("--runs", type=int, default=3, help="Replays per verification (default: 3)")
+    rl.add_argument("--variants", default=None, help="Comma-separated build variants (default: all)")
+    rl.add_argument("--no-patches", action="store_true", help="Skip patch-verification trajectories")
+    rl.add_argument("--sample-out", type=Path, metavar="PATH", help="Also write a stratified sample JSONL")
+    rl.add_argument("--sample-per-stratum", type=int, default=2)
+    rl.add_argument("--stats", type=Path, metavar="PATH", help="Write dataset statistics JSON")
+
     gr = sub.add_parser("graph", help="Print an environment's Behavioral State Graph as JSON")
     gr.add_argument("--env", default="fintech")
 
@@ -159,6 +172,35 @@ def _cmd_remediate(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_export_rlvr(args: argparse.Namespace) -> int:
+    from cubic.rlvr import build_dataset, dataset_stats, stratified_sample, write_jsonl
+
+    def apps(text: str) -> tuple[str, ...]:
+        return tuple(a.strip() for a in text.split(",") if a.strip())
+
+    splits = {"train": apps(args.train), "eval": apps(args.eval_apps)}
+    variants = apps(args.variants) if args.variants else None
+    records = build_dataset(splits, runs=args.runs, variants=variants, include_patches=not args.no_patches)
+    digest = write_jsonl(records, args.out)
+    stats = dataset_stats(records, sha256=digest, runs=args.runs)
+    print(f"{len(records)} trajectories -> {args.out} (sha256 {digest[:12]})")
+    for split, summary in stats["splits"].items():
+        print(f"  {split:<5} {','.join(summary['envs']):<16} rows={summary['rows']:<5} "
+              f"prompts={summary['prompts']:<4} rewards={summary['reward_histogram']} "
+              f"mean={summary['mean_reward']}")
+    if args.sample_out:
+        sample = stratified_sample(records, args.sample_per_stratum)
+        stats["sample"] = {"path": args.sample_out.as_posix(), "rows": len(sample),
+                           "per_stratum": args.sample_per_stratum,
+                           "sha256": write_jsonl(sample, args.sample_out)}
+        print(f"  sample: {len(sample)} rows -> {args.sample_out}")
+    if args.stats:
+        args.stats.parent.mkdir(parents=True, exist_ok=True)
+        args.stats.write_text(json.dumps(stats, indent=2) + "\n")
+        print(f"  stats -> {args.stats}")
+    return 0
+
+
 def _load_personas(path: Path) -> list:
     from cubic.graph import ActorPersona
 
@@ -217,6 +259,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _cmd_search(args)
     if args.command == "remediate":
         return _cmd_remediate(args)
+    if args.command == "export-rlvr":
+        return _cmd_export_rlvr(args)
     if args.command == "graph":
         from cubic.gym import load_environment
 

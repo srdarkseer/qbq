@@ -1,0 +1,63 @@
+"""RLVR data engine: verifiable-reward trajectories from the Bug Gym, exported as JSONL."""
+
+from cubic.rlvr.export import (
+    DEFAULT_SPLITS,
+    LeakageError,
+    build_dataset,
+    check_leakage,
+    dataset_stats,
+    jsonl_lines,
+    stratified_sample,
+    write_jsonl,
+)
+from cubic.rlvr.recorder import (
+    APP_ENVIRONMENTS,
+    TrajectoryRecord,
+    arecord_environment,
+    ascore_patch,
+    corrupt,
+    load_app_environment,
+    synthetic_bad_patches,
+)
+from cubic.rlvr.rewards import (
+    REWARDS,
+    ActionError,
+    Outcome,
+    RewardEngine,
+    VerifierReward,
+    action_json,
+    build_test_prompt,
+    completion_text,
+    outcome_for,
+    parse_action,
+    prompt_id,
+)
+
+__all__ = [
+    "APP_ENVIRONMENTS",
+    "DEFAULT_SPLITS",
+    "REWARDS",
+    "ActionError",
+    "LeakageError",
+    "Outcome",
+    "RewardEngine",
+    "TrajectoryRecord",
+    "VerifierReward",
+    "action_json",
+    "arecord_environment",
+    "ascore_patch",
+    "build_dataset",
+    "build_test_prompt",
+    "check_leakage",
+    "completion_text",
+    "corrupt",
+    "dataset_stats",
+    "jsonl_lines",
+    "load_app_environment",
+    "outcome_for",
+    "parse_action",
+    "prompt_id",
+    "stratified_sample",
+    "synthetic_bad_patches",
+    "write_jsonl",
+]

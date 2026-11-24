@@ -1,0 +1,112 @@
+{
+  "dataset": "cubic-rlvr",
+  "format": "jsonl; TRL conversational prompt/completion + reward",
+  "reward_scheme": {
+    "true_violation": 1.0,
+    "patch_verified": 1.0,
+    "holds": 0.0,
+    "false_positive": -1.0,
+    "flaky": -1.0,
+    "malformed": -1.0,
+    "patch_rejected": -1.0
+  },
+  "runs_per_verification": 3,
+  "rows": 1427,
+  "sha256": "f72c40cf98c64f897ab002278f99f651cfd648de5ac5c42c014797a318dd6441",
+  "leakage": {
+    "shared_prompts": 0,
+    "shared_envs": [],
+    "envs_by_split": {
+      "eval": [
+        "saas"
+      ],
+      "train": [
+        "fintech"
+      ]
+    }
+  },
+  "splits": {
+    "eval": {
+      "envs": [
+        "saas"
+      ],
+      "rows": 597,
+      "prompts": 35,
+      "by_task": {
+        "patch/rule_patch": 10,
+        "patch/synthetic_patch": 16,
+        "test/malformed": 31,
+        "test/pool": 540
+      },
+      "by_outcome": {
+        "false_positive": 34,
+        "holds": 488,
+        "malformed": 31,
+        "patch_rejected": 16,
+        "patch_verified": 10,
+        "true_violation": 18
+      },
+      "reward_histogram": {
+        "-1.0": 81,
+        "+0.0": 488,
+        "+1.0": 28
+      },
+      "mean_reward": -0.088777,
+      "pool_mean_reward": -0.02963,
+      "search_plan_mean_reward": 0.044444,
+      "policy_pruned_mean_reward": -0.226667,
+      "by_oracle_mean_reward": {
+        "conservation": 0.083333,
+        "forbidden": -0.041667,
+        "rejected_input": 0.166667,
+        "rejected_transition": -0.333333,
+        "success": -0.121212,
+        "unauthenticated": 0.0
+      }
+    },
+    "train": {
+      "envs": [
+        "fintech"
+      ],
+      "rows": 830,
+      "prompts": 28,
+      "by_task": {
+        "patch/rule_patch": 10,
+        "patch/synthetic_patch": 16,
+        "test/malformed": 24,
+        "test/pool": 780
+      },
+      "by_outcome": {
+        "false_positive": 88,
+        "holds": 658,
+        "malformed": 24,
+        "patch_rejected": 16,
+        "patch_verified": 10,
+        "true_violation": 34
+      },
+      "reward_histogram": {
+        "-1.0": 128,
+        "+0.0": 658,
+        "+1.0": 44
+      },
+      "mean_reward": -0.101205,
+      "pool_mean_reward": -0.069231,
+      "search_plan_mean_reward": 0.066667,
+      "policy_pruned_mean_reward": -0.505747,
+      "by_oracle_mean_reward": {
+        "conservation": 0.095238,
+        "forbidden": -0.043478,
+        "rejected_input": -0.071429,
+        "rejected_transition": 0.333333,
+        "success": -0.236111,
+        "unauthenticated": 0.0
+      }
+    }
+  },
+  "sample": {
+    "path": "datasets/cubic_rlvr_sample.jsonl",
+    "rows": 24,
+    "per_stratum": 2,
+    "sha256": "83b39d43762ffa0dea6dd63765e900783d417454328778050de54fc84c2b89d0"
+  }
+}
