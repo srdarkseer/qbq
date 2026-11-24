@@ -1,5 +1,8 @@
 """Gray-box application compiler: source code + runtime -> Behavioral State Graph."""
 
+from cubic.compiler.dynamic import DynamicObservation, DynamicRoute, aintrospect, introspect
+from cubic.compiler.invariants import synthesize_invariants
+from cubic.compiler.merge import CompileReport, CompileResult, acompile_app, build_graph, compile_app
 from cubic.compiler.static import (
     LedgerSpec,
     RequestModel,
@@ -9,13 +12,26 @@ from cubic.compiler.static import (
     analyze_sources,
     extract_candidates,
 )
+from cubic.compiler.target import TargetError, load_target
 
 __all__ = [
+    "CompileReport",
+    "CompileResult",
+    "DynamicObservation",
+    "DynamicRoute",
     "LedgerSpec",
     "RequestModel",
     "StaticAnalysis",
     "StaticRoute",
+    "TargetError",
+    "acompile_app",
+    "aintrospect",
     "analyze_files",
     "analyze_sources",
+    "build_graph",
+    "compile_app",
     "extract_candidates",
+    "introspect",
+    "load_target",
+    "synthesize_invariants",
 ]
