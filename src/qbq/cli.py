@@ -11,6 +11,36 @@ from pathlib import Path
 from qbq import __version__
 
 
+def _add_llm_flags(parser: argparse.ArgumentParser, *, role: str) -> None:
+    group = parser.add_argument_group(
+        "LLM provider", f"Optional live model for {role}. Proposals only: the deterministic verifier decides.")
+    group.add_argument("--llm-provider", choices=("none", "gemini", "openai"), default="none",
+                       help="none (default, offline) | gemini | openai (any OpenAI-compatible server)")
+    group.add_argument("--llm-model", default="gemini-2.5-flash", help="Model name (default: gemini-2.5-flash)")
+    group.add_argument("--api-key-env", default="GEMINI_API_KEY",
+                       help="Environment variable holding the API key (default: GEMINI_API_KEY; "
+                            "--llm-provider openai falls back to OPENAI_API_KEY)")
+    group.add_argument("--llm-base-url", default=None,
+                       help="Override the endpoint base URL (default: provider's; openai honours $OPENAI_BASE_URL)")
+
+
+def _llm_provider(args: argparse.Namespace):
+    """Build the provider from flags; keys come from the environment, never argv."""
+    from qbq.llm import build_provider
+
+    return build_provider(args.llm_provider, model=args.llm_model, api_key_env=args.api_key_env,
+                          base_url=args.llm_base_url)
+
+
+def _report_llm(provider, *components) -> None:
+    if provider is None:
+        return
+    errors = [e for c in components if c is not None for e in getattr(c, "errors", [])]
+    u = provider.usage
+    print(f"llm: {provider.name} {provider.model} calls={u.calls} retries={u.retries} failures={u.failures} "
+          f"tokens={u.prompt_tokens}+{u.completion_tokens} unusable_replies={len(errors)}", file=sys.stderr)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="qbq", description='QbQ (pronounced "Cubic") QA & security engine')
     parser.add_argument("--version", action="version", version=f"qbq {__version__}")
@@ -45,6 +75,7 @@ def build_parser() -> argparse.ArgumentParser:
     se.add_argument("--beam-width", type=int, default=3, help="Tests kept per frame (default: 3)")
     se.add_argument("--max-tests", type=int, default=None, help="Global test budget")
     se.add_argument("--json", type=Path, metavar="PATH", help="Write the full search result JSON to PATH")
+    _add_llm_flags(se, role="ranking candidate test sequences (LLMGuidedPolicy)")
 
     re_ = sub.add_parser(
         "remediate",
@@ -64,6 +95,7 @@ def build_parser() -> argparse.ArgumentParser:
                      help="Where to write test_regression_<invariant>.py files (default: regression_tests)")
     re_.add_argument("--patch-dir", type=Path, metavar="DIR", help="Also write each verified patch as a .patch file")
     re_.add_argument("--json", type=Path, metavar="PATH", help="Write the full remediation report JSON to PATH")
+    _add_llm_flags(re_, role="ranking tests and proposing patches the rule patcher cannot (LLMPatcher)")
     re_.add_argument("--require-verified", action="store_true",
                      help="Exit non-zero unless every finding has a verified patch")
 
@@ -115,9 +147,20 @@ def _cmd_search(args: argparse.Namespace) -> int:
 
     graph = (StateGraph.from_json(args.graph.read_text()) if args.graph
              else load_environment(args.env).graph)
+    from qbq.llm import LLMError, ProviderRankingModel, graph_secrets
+    from qbq.search import LLMGuidedPolicy
+
     config = SearchConfig(beam_width=args.beam_width, per_invariant=args.per_invariant,
                           max_tests=args.max_tests)
-    result = search(graph, config=config)
+    try:
+        provider = _llm_provider(args)
+    except LLMError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    policy = (LLMGuidedPolicy(ProviderRankingModel(provider, secrets=graph_secrets(graph)))
+              if provider else None)
+    result = search(graph, policy, config=config)
+    _report_llm(provider, policy)
     for e in result.emitted:
         print(f"{e.rank:>3}  {e.priority:6.2f}  {e.test.combinator.value:<19} {e.test.invariant_id:<34} "
               f"{e.test.hypothesis}")
@@ -155,7 +198,23 @@ def _cmd_remediate(args: argparse.Namespace) -> int:
         env = load_environment(name)
         if env.app_source is None and f"{args.env}-compiled" in ENVIRONMENTS:
             env = load_environment(f"{args.env}-compiled")
-    report = remediate(env, variant=args.variant, runs=args.runs, out_dir=args.out_dir)
+    from qbq.llm import LLMError, ProviderPatchModel, ProviderRankingModel, graph_secrets
+    from qbq.remediate import LLMPatcher, RulePatcher
+    from qbq.search import LLMGuidedPolicy
+
+    try:
+        provider = _llm_provider(args)
+    except LLMError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    policy = patcher = None
+    if provider is not None:
+        secrets = graph_secrets(env.graph)
+        policy = LLMGuidedPolicy(ProviderRankingModel(provider, secrets=secrets))
+        patcher = LLMPatcher(ProviderPatchModel(provider, secrets=secrets))
+    report = remediate(env, variant=args.variant, runs=args.runs, out_dir=args.out_dir, policy=policy,
+                       patchers=[RulePatcher(), patcher] if patcher else None)
+    _report_llm(provider, policy, patcher)
 
     print(f"QbQ remediate: environment={report.environment} variant={report.variant} "
           f"runs={report.runs} plan={report.plan_tests} tests "
