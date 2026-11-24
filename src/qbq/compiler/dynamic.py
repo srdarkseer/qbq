@@ -146,8 +146,21 @@ def module_display_name(module: str | None, source_path: str | None) -> str | No
 
 
 def _routes_of(app: Any) -> list[Any]:
+    """Every concrete route, with ``include_router`` mounts flattened.
+
+    Older FastAPI copies included routes into ``app.routes``. Newer releases (0.16x)
+    keep an ``_IncludedRouter`` wrapper whose ``effective_route_contexts()`` yields the
+    routes with every prefix applied. Both are handled, and nested mounts are walked.
+    """
     router = getattr(app, "router", app)
-    return list(getattr(router, "routes", []) or getattr(app, "routes", []))
+    out: list[Any] = []
+    for route in list(getattr(router, "routes", []) or getattr(app, "routes", [])):
+        contexts = getattr(route, "effective_route_contexts", None)
+        if callable(contexts):
+            out.extend(contexts())
+        else:
+            out.append(route)
+    return out
 
 
 def _endpoint_facts(endpoint: Any) -> tuple[str | None, str | None, str | None, int | None]:

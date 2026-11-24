@@ -75,7 +75,8 @@ def external_environment(
     else:
         snap_fn, snap_name = (lambda app_: DbSnapshot()), None
 
-    graph = compile_app(lambda: factory(), personas=list(personas), app_name=app_name).graph
+    graph = compile_app(lambda: factory(), personas=list(personas), app_name=app_name,
+                        app_module=module_name).graph
     return Environment(
         name=name or f"external:{module_name}",
         graph=graph,

@@ -23,6 +23,7 @@ from pydantic import BaseModel
 
 from qbq.compiler.dynamic import DynamicObservation, DynamicRoute, aintrospect, canonicalize
 from qbq.compiler.grounding import aground_personas
+from qbq.compiler.sources import collect_sources
 from qbq.compiler.invariants import synthesize_invariants
 from qbq.compiler.static import (
     StaticAnalysis,
@@ -180,12 +181,19 @@ async def acompile_app(
     synthesize: bool = True,
     probe: bool = True,
     ground: bool = True,
+    app_module: str | None = None,
 ) -> CompileResult:
+    """Compile ``app_factory`` into a State Graph.
+
+    ``app_module`` is the module that builds the app (where ``include_router`` mounts
+    usually live). The static pass reads it together with the endpoint modules and
+    their local import closure (``deps.py``, ``schemas.py``...).
+    """
     t0 = time.perf_counter()
     dynamic = await aintrospect(app_factory, probe=probe)
     t1 = time.perf_counter()
     sources = []
-    for display, path in dynamic.source_files:
+    for display, path in collect_sources(dynamic.source_files, app_module):
         with open(path, encoding="utf-8") as fh:
             sources.append((display, fh.read()))
     static = analyze_sources(sources)

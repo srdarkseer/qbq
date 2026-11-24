@@ -123,7 +123,8 @@ async def aremediate(
     module = importlib.import_module(source.module)
     factory = getattr(module, source.factory)
     personas = [a.model_copy(update={"observed_state": {}}) for a in env.graph.actors]
-    compiled = await acompile_app(lambda: source.build(factory), personas=personas, app_name=env.graph.app_name)
+    compiled = await acompile_app(lambda: source.build(factory), personas=personas, app_name=env.graph.app_name,
+                                  app_module=source.module)
     graph = compiled.graph
     t1 = time.perf_counter()
     timings["compile"] = t1 - t0

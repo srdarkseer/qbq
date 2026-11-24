@@ -299,8 +299,10 @@ def _cmd_compile(args: argparse.Namespace) -> int:
         print(f"error: {exc}", file=sys.stderr)
         return 2
     personas = _load_personas(args.personas) if args.personas else []
+    module = target.partition(":")[0]
+    app_module = None if module.endswith(".py") or "/" in module else module
     result = compile_app(
-        factory, app_name=args.app_name, personas=personas,
+        factory, app_name=args.app_name, personas=personas, app_module=app_module,
         synthesize=not args.no_invariants, probe=not args.no_probe, ground=not args.no_ground,
     )
     r = result.report

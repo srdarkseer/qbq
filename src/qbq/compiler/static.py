@@ -5,15 +5,27 @@ FastAPI idioms used by typical services:
 
 * route decorators ``@<app|router>.<get|post|put|patch|delete>(path, status_code=...)``,
   including handlers nested inside an app factory;
-* auth dependencies via ``Annotated[..., Depends(fn)]`` aliases, inline
-  ``Annotated`` annotations, or ``= Depends(fn)`` defaults;
+* multi-file projects: ``APIRouter(prefix=..., dependencies=[...])`` objects mounted with
+  ``include_router(router, prefix=..., dependencies=[...])`` (nested mounts too), with
+  imports resolved across modules (``from .deps import CurrentUser``,
+  ``from app.routers import orders``);
+* dependencies via ``Annotated[..., Depends(fn)]`` aliases (also imported from another
+  module), inline ``Annotated`` annotations, ``= Depends(fn)`` defaults, decorator and
+  router ``dependencies=[...]``, transitive chains (``require_admin -> get_current_user``),
+  and dependency factories such as ``Depends(require_role("ADMIN"))``. A route is
+  authenticated if any dependency in its chain is; guards inside dependencies (ownership,
+  roles) count as the route's own guards;
 * guard clauses ``if <cond>: raise HTTPException(<status>)`` (role checks,
   ownership checks, lifecycle-state preconditions), followed one level into
   same-file helper functions such as ``owned_wallet(...)``;
 * state effects: constant writes to ``status``/``state`` fields, dict literals that
   create rows in a given state, mutated fields, ledger writes, and lock usage;
-* Pydantic request models (``class X(BaseModel)``) with ``Field`` constraints and
-  store collections (``dict[str, dict]`` entities, ``list[dict]`` ledgers).
+* Pydantic request models (``class X(BaseModel)``, subclasses of other models, v2
+  ``Annotated[int, Field(gt=0)]`` fields) defined in any analyzed module, and store
+  collections (``dict[str, dict]`` entities, ``list[dict]`` ledgers).
+
+``or``-guards (``if row is None or row["owner_id"] != user["id"]: raise ...``) are read as
+one guard per disjunct.
 
 Conjuncts of the form ``"flag" in/not in <name>`` are treated as feature flags and
 ignored when classifying a guard; the analyzer describes the hardened code path.
@@ -23,7 +35,7 @@ from __future__ import annotations
 
 import ast
 import re
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -209,6 +221,27 @@ def _conjuncts(test: ast.AST) -> list[ast.AST]:
     return [test]
 
 
+def _disjuncts(test: ast.AST) -> list[ast.AST]:
+    if isinstance(test, ast.BoolOp) and isinstance(test.op, ast.Or):
+        return [d for v in test.values for d in _disjuncts(v)]
+    return [test]
+
+
+def _depends_expr(node: ast.AST | None) -> ast.AST | None:
+    """The argument of the first ``Depends(<x>)`` call inside ``node``."""
+    if node is None:
+        return None
+    for sub in ast.walk(node):
+        if _call_name(sub) == "Depends" and isinstance(sub, ast.Call) and sub.args:
+            return sub.args[0]
+    return None
+
+
+def _module_name(display: str) -> str:
+    name = display.removesuffix(".py").replace("/", ".")
+    return name.removesuffix(".__init__")
+
+
 def _feature_flag(node: ast.AST) -> str | None:
     if (
         isinstance(node, ast.Compare) and len(node.ops) == 1
@@ -281,14 +314,224 @@ def _plural(word: str) -> str:
 FunctionNode = ast.FunctionDef | ast.AsyncFunctionDef
 
 
+def _field_constraints(call: ast.Call) -> list[tuple[str, Any]]:
+    return [(_CONSTRAINTS[kw.arg], kw.value.value) for kw in call.keywords
+            if kw.arg in _CONSTRAINTS and isinstance(kw.value, ast.Constant)]
+
+
+def _model_field(stmt: ast.AnnAssign) -> ModelField:
+    """One model field: ``x: int``, ``x: int = Field(gt=0)`` or ``x: Annotated[int, Field(gt=0)]``."""
+    assert isinstance(stmt.target, ast.Name)
+    annotation = stmt.annotation
+    constraints: list[tuple[str, Any]] = []
+    if (isinstance(annotation, ast.Subscript) and _dotted(annotation.value).split(".")[-1] == "Annotated"
+            and isinstance(annotation.slice, ast.Tuple) and annotation.slice.elts):
+        annotation, *metadata = annotation.slice.elts
+        for meta in metadata:
+            if isinstance(meta, ast.Call) and _call_name(meta) == "Field":
+                constraints += _field_constraints(meta)
+    json_type = _JSON_TYPES.get(_dotted(annotation))
+    required = stmt.value is None
+    if isinstance(stmt.value, ast.Call) and _call_name(stmt.value) == "Field":
+        has_default = bool(stmt.value.args) and not (
+            isinstance(stmt.value.args[0], ast.Constant) and stmt.value.args[0].value is Ellipsis
+        )
+        has_default |= any(k.arg in {"default", "default_factory"} for k in stmt.value.keywords)
+        required = not has_default
+        constraints += _field_constraints(stmt.value)
+    return ModelField(stmt.target.id, json_type, required, tuple(sorted(constraints)))
+
+
+@dataclass(frozen=True)
+class DepRef:
+    """A resolved dependency: function ``function`` in ``file``, called with ``args`` if a factory."""
+
+    file: str
+    function: str
+    args: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class DepInfo:
+    auth: bool = False
+    statuses: frozenset[int] = frozenset()
+    roles: frozenset[str] = frozenset()
+    bodies: tuple[ast.AST, ...] = ()
+
+
+class _Project:
+    """Cross-module symbol table over every analyzed file."""
+
+    _TABLES = {"function": "functions", "class": "classes", "alias": "aliases", "router": "routers"}
+
+    def __init__(self, analyzers: Iterable[_FileAnalyzer]) -> None:
+        self.analyzers = list(analyzers)
+        self.by_file = {a.file: a for a in self.analyzers}
+        self.by_module = {a.module: a for a in self.analyzers}
+        self._deps: dict[DepRef, DepInfo] = {}
+        self._in_progress: set[DepRef] = set()
+        for a in self.analyzers:
+            a.project = self
+        self.mounts: dict[tuple[str, str], tuple[str, tuple[DepRef, ...], tuple[str, str] | None]] = {}
+        for a in self.analyzers:
+            self._collect_mounts(a)
+
+    # -- symbol resolution ------------------------------------------------------
+
+    def resolve(self, an: _FileAnalyzer, name: str, kind: str, depth: int = 0) -> tuple[_FileAnalyzer, str, Any] | None:
+        table = getattr(an, self._TABLES[kind])
+        if name in table:
+            return an, name, table[name]
+        imp = an.imports.get(name)
+        if imp is None or imp[1] is None or depth > 8:
+            return None
+        target = self.by_module.get(imp[0])
+        return self.resolve(target, imp[1], kind, depth + 1) if target else None
+
+    def module_of(self, an: _FileAnalyzer, expr: ast.AST) -> _FileAnalyzer | None:
+        if isinstance(expr, ast.Name) and (imp := an.imports.get(expr.id)):
+            mod, sym = imp
+            return self.by_module.get(mod if sym is None else f"{mod}.{sym}")
+        return None
+
+    def dep_ref(self, an: _FileAnalyzer, expr: ast.AST | None) -> DepRef | None:
+        if expr is None:
+            return None
+        args: tuple[str, ...] = ()
+        if isinstance(expr, ast.Call):
+            args = tuple(v for a in expr.args if (v := _const_str(a)) is not None)
+            expr = expr.func
+        found = None
+        if isinstance(expr, ast.Name):
+            found = self.resolve(an, expr.id, "function")
+        elif isinstance(expr, ast.Attribute) and (mod := self.module_of(an, expr.value)) is not None:
+            found = self.resolve(mod, expr.attr, "function")
+        return DepRef(found[0].file, found[1], args) if found else None
+
+    def alias_ref(self, an: _FileAnalyzer, name: str) -> DepRef | None:
+        found = self.resolve(an, name, "alias")
+        return self.dep_ref(found[0], found[2]) if found else None
+
+    # -- dependency semantics ---------------------------------------------------
+
+    def dep_info(self, ref: DepRef) -> DepInfo:
+        if ref in self._deps:
+            return self._deps[ref]
+        if ref in self._in_progress:
+            return DepInfo()
+        self._in_progress.add(ref)
+        an = self.by_file[ref.file]
+        fn = an.functions[ref.function]
+        inner = [n for n in fn.body if isinstance(n, ast.FunctionDef | ast.AsyncFunctionDef)]  # factory closures
+        funcs = [fn, *inner]
+        statuses = {c for f in funcs for n in _walk_shallow(f.body) if (c := _http_exception_status(n)) is not None}
+        arg_names = {a.arg.lower() for f in funcs for a in f.args.args + f.args.kwonlyargs}
+        subs = [d for f in funcs for d in an.param_dependencies(f) if d != ref]
+        sub_infos = [self.dep_info(d) for d in subs]
+        params = {a.arg for a in fn.args.args + fn.args.kwonlyargs} | ({fn.args.vararg.arg} if fn.args.vararg else set())
+        roles: set[str] = set()
+        if ref.args:
+            for f in inner:
+                for node in _walk_shallow(f.body):
+                    if isinstance(node, ast.If) and _guard_raise(node) is not None and _compares_role_to(node.test, params):
+                        roles |= set(ref.args)
+        bodies = [*an.reachable_bodies(fn), *(b for f in inner for b in an.reachable_bodies(f))]
+        info = DepInfo(
+            auth=401 in statuses or "authorization" in arg_names or any(i.auth for i in sub_infos),
+            statuses=frozenset(statuses | {c for i in sub_infos for c in i.statuses}),
+            roles=frozenset(roles | {r for i in sub_infos for r in i.roles}),
+            bodies=tuple(bodies) + tuple(b for i in sub_infos for b in i.bodies),
+        )
+        self._in_progress.discard(ref)
+        self._deps[ref] = info
+        return info
+
+    # -- router mounts ----------------------------------------------------------
+
+    def _collect_mounts(self, an: _FileAnalyzer) -> None:
+        for node in ast.walk(an.tree):
+            if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                    and node.func.attr == "include_router" and node.args):
+                continue
+            target = node.args[0]
+            key: tuple[str, str] | None = None
+            if isinstance(target, ast.Attribute) and (mod := self.module_of(an, target.value)) is not None:
+                if target.attr in mod.routers:
+                    key = (mod.file, target.attr)
+            elif isinstance(target, ast.Name) and (found := self.resolve(an, target.id, "router")):
+                key = (found[0].file, found[1])
+            if key is None or key in self.mounts:
+                continue
+            prefix = next((_string_value(an, k.value) or "" for k in node.keywords if k.arg == "prefix"), "")
+            deps = tuple(d for k in node.keywords if k.arg == "dependencies"
+                         for d in an.dependency_list(k.value))
+            receiver = node.func.value
+            parent = (an.file, receiver.id) if isinstance(receiver, ast.Name) and receiver.id in an.routers else None
+            self.mounts[key] = (prefix, deps, parent)
+
+    def router_context(self, an: _FileAnalyzer, var: str, depth: int = 0) -> tuple[str, tuple[DepRef, ...]]:
+        """Full path prefix and inherited dependencies of router ``var`` defined in ``an``."""
+        own_prefix, own_deps = an.routers[var]
+        deps = tuple(d for e in own_deps if (d := self.dep_ref(an, e)) is not None)
+        mount = self.mounts.get((an.file, var))
+        if mount is None or depth > 8:
+            return own_prefix, deps
+        prefix, mount_deps, parent = mount
+        outer_prefix, outer_deps = ("", ())
+        if parent is not None:
+            outer_prefix, outer_deps = self.router_context(self.by_file[parent[0]], parent[1], depth + 1)
+        return outer_prefix + prefix + own_prefix, outer_deps + mount_deps + deps
+
+
+def _string_value(an: _FileAnalyzer, node: ast.AST | None, depth: int = 0) -> str | None:
+    """A literal string, a name bound once in the file to such a value, or a ``+`` of those."""
+    if node is None or depth > 8:
+        return None
+    if (value := _const_str(node)) is not None:
+        return value
+    if isinstance(node, ast.Name):
+        bound = an.assigned.get(node.id, [])
+        return _string_value(an, bound[0], depth + 1) if len(bound) == 1 else None
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
+        left, right = _string_value(an, node.left, depth + 1), _string_value(an, node.right, depth + 1)
+        return left + right if left is not None and right is not None else None
+    return None
+
+
+def _compares_role_to(test: ast.AST, params: set[str]) -> bool:
+    """``user["role"] not in roles`` / ``user.role != role`` where the right side is a factory parameter."""
+    for node in ast.walk(test):
+        if (isinstance(node, ast.Compare) and len(node.ops) == 1
+                and isinstance(node.ops[0], ast.NotIn | ast.NotEq)
+                and _key_of(node.left) in ROLE_FIELDS
+                and isinstance(node.comparators[0], ast.Name) and node.comparators[0].id in params):
+            return True
+    return False
+
+
+def _router_call(value: ast.AST) -> tuple[str, list[ast.AST]] | None:
+    if _call_name(value) != "APIRouter" or not isinstance(value, ast.Call):
+        return None
+    prefix = next((_const_str(k.value) or "" for k in value.keywords if k.arg == "prefix"), "")
+    deps = [e for k in value.keywords if k.arg == "dependencies" and isinstance(k.value, ast.List | ast.Tuple)
+            for elt in k.value.elts if (e := _depends_expr(elt)) is not None]
+    return prefix, deps
+
+
 class _FileAnalyzer:
     def __init__(self, tree: ast.Module, display_name: str) -> None:
         self.tree = tree
         self.file = display_name
+        self.module = _module_name(display_name)
+        self.package = self.module if display_name.endswith("__init__.py") else self.module.rpartition(".")[0]
         self.functions: dict[str, FunctionNode] = {}  # name -> first definition (helper lookup)
         self.all_functions: list[FunctionNode] = []  # every definition, including duplicates
-        self.aliases: dict[str, str] = {}  # alias name -> dependency function
+        self.aliases: dict[str, ast.AST] = {}  # alias name -> Depends(<target>) expression
         self.classes: dict[str, ast.ClassDef] = {}
+        self.routers: dict[str, tuple[str, list[ast.AST]]] = {}  # var -> (prefix, dependency exprs)
+        self.imports: dict[str, tuple[str, str | None]] = {}  # local name -> (module, symbol or None)
+        self.assigned: dict[str, list[ast.AST]] = {}  # name -> every value bound to it (constant prefixes)
+        self.project: _Project | None = None
         for node in ast.walk(tree):
             if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
                 self.functions.setdefault(node.name, node)
@@ -296,33 +539,54 @@ class _FileAnalyzer:
             elif isinstance(node, ast.ClassDef):
                 self.classes.setdefault(node.name, node)
             elif isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
-                if (dep := self._depends_in(node.value)) is not None:
+                self.assigned.setdefault(node.targets[0].id, []).append(node.value)
+                if (router := _router_call(node.value)) is not None:
+                    self.routers[node.targets[0].id] = router
+                elif (dep := _depends_expr(node.value)) is not None:
                     self.aliases[node.targets[0].id] = dep
+            elif isinstance(node, ast.ImportFrom):
+                base = node.module or ""
+                if node.level:
+                    parts = self.package.split(".") if self.package else []
+                    parts = parts[: len(parts) - (node.level - 1)] if node.level > 1 else parts
+                    base = ".".join([*parts, *([node.module] if node.module else [])])
+                for alias in node.names:
+                    self.imports[alias.asname or alias.name] = (base, alias.name)
+            elif isinstance(node, ast.Import):
+                for alias in node.names:
+                    local = alias.asname or alias.name.split(".")[0]
+                    self.imports[local] = (alias.name if alias.asname else alias.name.split(".")[0], None)
+
+    @property
+    def proj(self) -> _Project:
+        if self.project is None:
+            _Project([self])
+        assert self.project is not None
+        return self.project
 
     # -- dependencies -------------------------------------------------------
 
-    def _depends_in(self, node: ast.AST | None) -> str | None:
-        if node is None:
-            return None
-        for sub in ast.walk(node):
-            if _call_name(sub) == "Depends" and isinstance(sub, ast.Call) and sub.args:
-                target = sub.args[0]
-                if isinstance(target, ast.Name):
-                    return target.id
-        return None
-
-    def _param_dependencies(self, fn: FunctionNode) -> list[str]:
+    def param_dependencies(self, fn: FunctionNode) -> list[DepRef]:
         args = fn.args.posonlyargs + fn.args.args + fn.args.kwonlyargs
         defaults: list[ast.AST | None] = [None] * (len(fn.args.posonlyargs + fn.args.args) - len(fn.args.defaults))
         defaults += list(fn.args.defaults) + list(fn.args.kw_defaults)
-        deps: list[str] = []
+        deps: list[DepRef] = []
         for arg, default in zip(args, defaults, strict=True):
             ann = arg.annotation
-            if isinstance(ann, ast.Name) and ann.id in self.aliases:
-                deps.append(self.aliases[ann.id])
-            elif (dep := self._depends_in(ann)) is not None or (dep := self._depends_in(default)) is not None:
-                deps.append(dep)
+            ref = None
+            if isinstance(ann, ast.Name):
+                ref = self.proj.alias_ref(self, ann.id)
+            if ref is None:
+                ref = self.proj.dep_ref(self, _depends_expr(ann) or _depends_expr(default))
+            if ref is not None:
+                deps.append(ref)
         return deps
+
+    def dependency_list(self, node: ast.AST) -> list[DepRef]:
+        """Resolve a ``dependencies=[Depends(a), Depends(b("x"))]`` keyword value."""
+        if not isinstance(node, ast.List | ast.Tuple):
+            return []
+        return [r for elt in node.elts if (r := self.proj.dep_ref(self, _depends_expr(elt))) is not None]
 
     def dependency_statuses(self, name: str) -> frozenset[int]:
         fn = self.functions.get(name)
@@ -330,29 +594,29 @@ class _FileAnalyzer:
             return frozenset()
         return frozenset(c for n in _walk_shallow(fn.body) if (c := _http_exception_status(n)) is not None)
 
-    def _is_auth_dependency(self, name: str) -> bool:
-        fn = self.functions.get(name)
-        if fn is None:
-            return False
-        arg_names = {a.arg.lower() for a in fn.args.args + fn.args.kwonlyargs}
-        return 401 in self.dependency_statuses(name) or "authorization" in arg_names
-
     # -- helpers called from handlers -----------------------------------------
 
-    def _reachable_bodies(self, fn: FunctionNode, depth: int = 3) -> list[ast.AST]:
-        seen = {fn.name}
+    def reachable_bodies(self, fn: FunctionNode, depth: int = 3) -> list[ast.AST]:
+        """``fn``'s body plus the bodies of helpers it calls (followed across imports)."""
+        alias_targets = {e.id for e in self.aliases.values() if isinstance(e, ast.Name)}
+        seen = {(self.file, fn.name)}
         bodies: list[ast.AST] = list(fn.body)
-        frontier = [fn]
+        frontier: list[tuple[_FileAnalyzer, FunctionNode]] = [(self, fn)]
         for _ in range(depth):
-            nxt: list[FunctionNode] = []
-            for f in frontier:
+            nxt: list[tuple[_FileAnalyzer, FunctionNode]] = []
+            for an, f in frontier:
                 for node in _walk_shallow(f.body):
-                    if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
-                        callee = self.functions.get(node.func.id)
-                        if callee is not None and callee.name not in seen and callee.name not in self.aliases.values():
-                            seen.add(callee.name)
-                            bodies.extend(callee.body)
-                            nxt.append(callee)
+                    if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)):
+                        continue
+                    found = an.proj.resolve(an, node.func.id, "function")
+                    if found is None:
+                        continue
+                    target_an, name, callee = found
+                    if (target_an.file, name) in seen or (target_an is self and name in alias_targets):
+                        continue
+                    seen.add((target_an.file, name))
+                    bodies.extend(callee.body)
+                    nxt.append((target_an, callee))
             frontier = nxt
         return bodies
 
@@ -402,28 +666,26 @@ class _FileAnalyzer:
 
     # -- models ---------------------------------------------------------------
 
-    def models(self) -> list[RequestModel]:
+    def models(self, model_names: set[str] | None = None) -> list[RequestModel]:
+        names = model_names if model_names is not None else {
+            c.name for c in self.classes.values()
+            if any(_dotted(b).split(".")[-1] == "BaseModel" for b in c.bases)
+        }
         out: list[RequestModel] = []
         for cls in self.classes.values():
-            if not any(_dotted(b).split(".")[-1] == "BaseModel" for b in cls.bases):
+            if cls.name not in names:
                 continue
-            fields: list[ModelField] = []
+            fields: dict[str, ModelField] = {}
+            for base in cls.bases:  # inherited fields first, then own fields override
+                found = self.proj.resolve(self, _dotted(base).split(".")[-1], "class")
+                if found and found[1] in names and found[2] is not cls:
+                    for parent in found[0].models(names):
+                        if parent.name == found[1]:
+                            fields.update({f.name: f for f in parent.fields})
             for stmt in cls.body:
-                if not (isinstance(stmt, ast.AnnAssign) and isinstance(stmt.target, ast.Name)):
-                    continue
-                json_type = _JSON_TYPES.get(_dotted(stmt.annotation))
-                required, constraints = stmt.value is None, []
-                if isinstance(stmt.value, ast.Call) and _call_name(stmt.value) == "Field":
-                    has_default = bool(stmt.value.args) and not (
-                        isinstance(stmt.value.args[0], ast.Constant) and stmt.value.args[0].value is Ellipsis
-                    )
-                    has_default |= any(k.arg in {"default", "default_factory"} for k in stmt.value.keywords)
-                    required = not has_default
-                    for kw in stmt.value.keywords:
-                        if kw.arg in _CONSTRAINTS and isinstance(kw.value, ast.Constant):
-                            constraints.append((_CONSTRAINTS[kw.arg], kw.value.value))
-                fields.append(ModelField(stmt.target.id, json_type, required, tuple(sorted(constraints))))
-            out.append(RequestModel(cls.name, tuple(fields), SourceLocation(self.file, cls.lineno, cls.name)))
+                if isinstance(stmt, ast.AnnAssign) and isinstance(stmt.target, ast.Name):
+                    fields[stmt.target.id] = _model_field(stmt)
+            out.append(RequestModel(cls.name, tuple(fields.values()), SourceLocation(self.file, cls.lineno, cls.name)))
         return out
 
     def roles(self) -> set[str]:
@@ -450,22 +712,31 @@ class _FileAnalyzer:
                 if method is None or path is None:
                     continue
                 status = next((_const_int(k.value) for k in dec.keywords if k.arg == "status_code"), None)
-                routes.append(self._route(fn, method, path, status, dec.lineno, ledger_methods, lock_hint))
+                prefix, extra = "", ()
+                receiver = dec.func.value
+                if isinstance(receiver, ast.Name) and receiver.id in self.routers:
+                    prefix, extra = self.proj.router_context(self, receiver.id)
+                extra = tuple(extra) + tuple(
+                    d for k in dec.keywords if k.arg == "dependencies" for d in self.dependency_list(k.value))
+                routes.append(self._route(fn, method, prefix + path, status, dec.lineno, ledger_methods,
+                                          lock_hint, extra))
         return routes
 
     def _route(
         self, fn: FunctionNode, method: HttpMethod, path: str, status: int | None,
         decorator_line: int, ledger_methods: set[str], lock_hint: str,
+        extra_deps: tuple[DepRef, ...] = (),
     ) -> StaticRoute:
-        deps = self._param_dependencies(fn)
-        auth = next((d for d in deps if self._is_auth_dependency(d)), None)
+        deps = [*extra_deps, *self.param_dependencies(fn)]
+        infos = [self.proj.dep_info(d) for d in deps]
+        auth = next((d.function for d, i in zip(deps, infos, strict=True) if i.auth), None)
         body_model = next(
             (a.annotation.id for a in fn.args.args
-             if isinstance(a.annotation, ast.Name) and a.annotation.id in self.classes),
+             if isinstance(a.annotation, ast.Name) and self.proj.resolve(self, a.annotation.id, "class")),
             None,
         )
-        bodies = self._reachable_bodies(fn)
-        roles: set[str] = set()
+        bodies = self.reachable_bodies(fn) + [b for i in infos for b in i.bodies]
+        roles: set[str] = {r for i in infos for r in i.roles}
         flags: set[str] = set()
         ownership = False
         raised: set[int] = set()
@@ -481,19 +752,20 @@ class _FileAnalyzer:
             if (code := _http_exception_status(node)) is not None:
                 raised.add(code)
             if isinstance(node, ast.If) and (code := _guard_raise(node)) is not None:
-                conj = _conjuncts(node.test)
-                flags.update(f for c in conj if (f := _feature_flag(c)))
-                rest = [c for c in conj if _feature_flag(c) is None]
-                if any(_is_ownership_compare(c) for c in rest):
-                    ownership = True
-                elif len(rest) == 1 and (match := _not_eq_const(rest[0])):
-                    key, value = match
-                    if key in ROLE_FIELDS:
-                        roles.add(value)
-                    elif key in LIFECYCLE_FIELDS:
-                        requirements.append(StateRequirement(key, value, code))
-                    else:
-                        preconditions.append(StateRequirement(key, value, code))
+                for test in _disjuncts(node.test):
+                    conj = _conjuncts(test)
+                    flags.update(f for c in conj if (f := _feature_flag(c)))
+                    rest = [c for c in conj if _feature_flag(c) is None]
+                    if any(_is_ownership_compare(c) for c in rest):
+                        ownership = True
+                    elif len(rest) == 1 and (match := _not_eq_const(rest[0])):
+                        key, value = match
+                        if key in ROLE_FIELDS:
+                            roles.add(value)
+                        elif key in LIFECYCLE_FIELDS:
+                            requirements.append(StateRequirement(key, value, code))
+                        else:
+                            preconditions.append(StateRequirement(key, value, code))
             elif isinstance(node, ast.If):
                 flags.update(f for c in _conjuncts(node.test) if (f := _feature_flag(c)))
             if isinstance(node, ast.Assign | ast.AugAssign):
@@ -521,8 +793,7 @@ class _FileAnalyzer:
             if isinstance(node, ast.AsyncWith | ast.With):
                 uses_lock |= any(lock_hint in _dotted(item.context_expr).lower() for item in node.items)
 
-        if auth:
-            raised |= self.dependency_statuses(auth)
+        raised |= {c for i in infos for c in i.statuses}
         return StaticRoute(
             method=method, path=path,
             location=SourceLocation(self.file, fn.lineno, fn.name), decorator_line=decorator_line,
@@ -537,38 +808,49 @@ class _FileAnalyzer:
 
 
 def analyze_sources(sources: Iterable[tuple[str, str]]) -> StaticAnalysis:
-    """Analyze ``(display_name, source_text)`` pairs."""
+    """Analyze ``(display_name, source_text)`` pairs as one project.
+
+    Display names are package-relative paths (``app/routers/orders.py``). They define
+    module names for resolving imports between the analyzed files.
+    """
     files: list[str] = []
     total = 0
-    routes: list[StaticRoute] = []
-    models: list[RequestModel] = []
-    roles: set[str] = set()
-    entities: set[str] = set()
-    ledger: LedgerSpec | None = None
-    dep_statuses: dict[str, frozenset[int]] = {}
-
+    analyzers: list[_FileAnalyzer] = []
     for name, text in sorted(sources):
         files.append(name)
         total += len(text.encode())
-        analyzer = _FileAnalyzer(ast.parse(text, filename=name), name)
-        file_entities, lists, method_attrs = analyzer.collections()
+        analyzers.append(_FileAnalyzer(ast.parse(text, filename=name), name))
+    _Project(analyzers)
+
+    entities: set[str] = set()
+    ledger: LedgerSpec | None = None
+    method_attrs: dict[str, set[str]] = {}
+    for analyzer in analyzers:
+        file_entities, lists, attrs = analyzer.collections()
         entities |= file_entities
-        spec = analyzer.ledger_spec(file_entities, lists)
-        ledger_methods = {m for m, attrs in method_attrs.items() if spec and spec.collection in attrs}
-        file_routes = analyzer.routes(ledger_methods)
-        if spec and spec.entity:
-            balance = sorted({
-                f for r in file_routes if r.writes_ledger for f in r.mutated_fields
-                if f not in {"id", spec.account_field, spec.amount_field} | LIFECYCLE_FIELDS
-            })
-            if len(balance) == 1:
-                spec = LedgerSpec(spec.collection, spec.account_field, spec.amount_field, spec.entity, balance[0])
-        ledger = ledger or spec
-        routes += file_routes
-        models += analyzer.models()
-        roles |= analyzer.roles()
-        for dep in sorted(set(analyzer.aliases.values())):
-            dep_statuses[dep] = analyzer.dependency_statuses(dep)
+        for method, touched in attrs.items():
+            method_attrs.setdefault(method, set()).update(touched)
+        ledger = ledger or analyzer.ledger_spec(file_entities, lists)
+    ledger_methods = {m for m, attrs in method_attrs.items() if ledger and ledger.collection in attrs}
+
+    routes: list[StaticRoute] = [r for a in analyzers for r in a.routes(ledger_methods)]
+    if ledger and ledger.entity:
+        balance = sorted({
+            f for r in routes if r.writes_ledger for f in r.mutated_fields
+            if f not in {"id", ledger.account_field, ledger.amount_field} | LIFECYCLE_FIELDS
+        })
+        if len(balance) == 1:
+            ledger = LedgerSpec(ledger.collection, ledger.account_field, ledger.amount_field, ledger.entity, balance[0])
+
+    model_names = _model_class_names(analyzers)
+    models: list[RequestModel] = [m for a in analyzers for m in a.models(model_names)]
+    roles: set[str] = set().union(*(a.roles() for a in analyzers)) if analyzers else set()
+    dep_statuses: dict[str, frozenset[int]] = {}
+    for analyzer in analyzers:
+        for alias in sorted(analyzer.aliases):
+            ref = analyzer.proj.alias_ref(analyzer, alias)
+            if ref is not None:
+                dep_statuses.setdefault(ref.function, analyzer.proj.dep_info(ref).statuses)
 
     routes.sort(key=lambda r: (r.path, r.method.value, r.location.file, r.location.line))
     models.sort(key=lambda m: (m.name, m.location.file))
@@ -577,6 +859,23 @@ def analyze_sources(sources: Iterable[tuple[str, str]]) -> StaticAnalysis:
         roles=frozenset(roles), entity_collections=frozenset(entities), ledger=ledger,
         dependency_statuses=dep_statuses,
     )
+
+
+def _model_class_names(analyzers: Sequence[_FileAnalyzer]) -> set[str]:
+    """Pydantic models: ``BaseModel`` subclasses, and (transitively) subclasses of those."""
+    names: set[str] = set()
+    changed = True
+    while changed:
+        changed = False
+        for analyzer in analyzers:
+            for cls in analyzer.classes.values():
+                if cls.name in names:
+                    continue
+                bases = {_dotted(b).split(".")[-1] for b in cls.bases}
+                if "BaseModel" in bases or bases & names:
+                    names.add(cls.name)
+                    changed = True
+    return names
 
 
 def analyze_files(paths: Iterable[Path | str], *, root: Path | str | None = None) -> StaticAnalysis:
