@@ -18,7 +18,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     ev = sub.add_parser("eval", help="Run the deterministic eval harness against a Bug Gym environment")
     ev.add_argument("--env", default="fintech",
-                    help="Bug Gym environment: fintech, fintech-compiled, fintech-autonomous (default: fintech)")
+                    help="Bug Gym environment: fintech, fintech-compiled, fintech-autonomous, saas-compiled, "
+                         "saas-autonomous (default: fintech)")
     ev.add_argument("--runs", type=int, default=3, help="Replays per candidate (default: 3)")
     ev.add_argument("--json", type=Path, metavar="PATH", help="Write the full JSON report to PATH")
     ev.add_argument("--min-recall", type=float, default=None, help="Fail if Recall@1 is below this")
@@ -43,6 +44,21 @@ def build_parser() -> argparse.ArgumentParser:
     se.add_argument("--beam-width", type=int, default=3, help="Tests kept per frame (default: 3)")
     se.add_argument("--max-tests", type=int, default=None, help="Global test budget")
     se.add_argument("--json", type=Path, metavar="PATH", help="Write the full search result JSON to PATH")
+
+    re_ = sub.add_parser(
+        "remediate",
+        help="Closed loop: compile, search, verify findings, synthesize + verify patches, export regression tests",
+    )
+    re_.add_argument("--env", default="fintech",
+                     help="Bug Gym app: fintech or saas (or any environment with an app source)")
+    re_.add_argument("--variant", default="vulnerable", help="Build to remediate (default: vulnerable)")
+    re_.add_argument("--runs", type=int, default=3, help="Replays per exploit / fix check (default: 3)")
+    re_.add_argument("--out-dir", type=Path, default=Path("regression_tests"),
+                     help="Where to write test_regression_<invariant>.py files (default: regression_tests)")
+    re_.add_argument("--patch-dir", type=Path, metavar="DIR", help="Also write each verified patch as a .patch file")
+    re_.add_argument("--json", type=Path, metavar="PATH", help="Write the full remediation report JSON to PATH")
+    re_.add_argument("--require-verified", action="store_true",
+                     help="Exit non-zero unless every finding has a verified patch")
 
     gr = sub.add_parser("graph", help="Print an environment's Behavioral State Graph as JSON")
     gr.add_argument("--env", default="fintech")
@@ -95,6 +111,51 @@ def _cmd_search(args: argparse.Namespace) -> int:
         args.json.parent.mkdir(parents=True, exist_ok=True)
         args.json.write_text(result.model_dump_json(indent=2) + "\n")
         print(f"\nSearch result written to {args.json}")
+    return 0
+
+
+def _cmd_remediate(args: argparse.Namespace) -> int:
+    import re
+
+    from cubic.gym import ENVIRONMENTS, load_environment
+    from cubic.remediate import remediate
+
+    name = args.env if args.env in ENVIRONMENTS else f"{args.env}-compiled"
+    env = load_environment(name)
+    if env.app_source is None and f"{args.env}-compiled" in ENVIRONMENTS:
+        env = load_environment(f"{args.env}-compiled")
+    report = remediate(env, variant=args.variant, runs=args.runs, out_dir=args.out_dir)
+
+    print(f"Cubic remediate: environment={report.environment} variant={report.variant} "
+          f"runs={report.runs} plan={report.plan_tests} tests "
+          f"({report.invariants_covered}/{report.graph['invariants']} invariants)\n")
+    print(f"{'invariant':<36} {'oracle':<20} {'patch':<26} {'verdict':<22} regression test")
+    for f in report.findings:
+        last = f.attempts[-1] if f.attempts else None
+        rule = f"{f.verified_patch.patcher}:{f.verified_patch.rule}" if f.verified_patch else "-"
+        verdict = last.verdict.value if last else (f.error or "no patch proposed")
+        test = f.regression_test
+        test_note = (f"{test.file} ({'valid' if test.valid else 'INVALID'})" if test else "-")
+        print(f"{f.invariant_id:<36} {f.oracle.value:<20} {rule:<26} {verdict:<22} {test_note}")
+    rate = report.patch_pass_rate
+    print(f"\n{report.verified}/{len(report.findings)} findings have a verified patch"
+          + (f" ({rate:.0%})" if rate is not None else "")
+          + f"; regression tests in {args.out_dir}/; total {report.timings_s['total']:.2f}s")
+
+    if args.patch_dir:
+        args.patch_dir.mkdir(parents=True, exist_ok=True)
+        for f in report.findings:
+            if f.verified_patch:
+                slug = re.sub(r"[^A-Za-z0-9]+", "_", f.invariant_id).strip("_")
+                (args.patch_dir / f"{slug}.patch").write_text(f.verified_patch.diff)
+        print(f"Verified patches written to {args.patch_dir}/")
+    if args.json:
+        args.json.parent.mkdir(parents=True, exist_ok=True)
+        args.json.write_text(report.model_dump_json(indent=2) + "\n")
+        print(f"Report written to {args.json}")
+    if args.require_verified and report.verified < len(report.findings):
+        print("GATE FAILED: some findings have no verified patch", file=sys.stderr)
+        return 1
     return 0
 
 
@@ -154,6 +215,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _cmd_compile(args)
     if args.command == "search":
         return _cmd_search(args)
+    if args.command == "remediate":
+        return _cmd_remediate(args)
     if args.command == "graph":
         from cubic.gym import load_environment
 

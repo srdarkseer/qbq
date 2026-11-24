@@ -22,10 +22,18 @@ from cubic.remediate.patcher import (
     load_context,
     propose_patches,
 )
+from cubic.remediate.pipeline import (
+    FindingRemediation,
+    RegressionCheck,
+    RemediationReport,
+    aremediate,
+    remediate,
+)
 from cubic.remediate.verify_fix import averify_fix, patched_module, verify_fix
 
 __all__ = [
     "ConfirmedFinding",
+    "FindingRemediation",
     "FixVerdict",
     "FixVerification",
     "FunctionalCheck",
@@ -34,17 +42,21 @@ __all__ = [
     "PatchError",
     "PatchModel",
     "PatchPrompt",
+    "RegressionCheck",
+    "RemediationReport",
     "Patcher",
     "RulePatcher",
     "SourceContext",
     "SourceRef",
     "apply_unified_diff",
+    "aremediate",
     "averify_fix",
     "build_patch_prompt",
     "export_regression_test",
     "load_context",
     "patched_module",
     "propose_patches",
+    "remediate",
     "render_regression_test",
     "regression_file_name",
     "verify_fix",

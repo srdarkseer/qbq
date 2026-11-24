@@ -5,7 +5,7 @@ typed **Behavioral State Graph**; only deterministic assertions on HTTP response
 database state count as findings.
 
 The full roadmap lives in [`global_agentic_qa_security_engine_build_plan.md`](global_agentic_qa_security_engine_build_plan.md).
-This repository currently implements **Milestones 1, 2 and 3**.
+This repository currently implements **Milestones 1 through 4**.
 
 ## Setup
 
@@ -14,6 +14,8 @@ uv sync
 uv run pytest
 uv run cubic eval --min-recall 1.0 --max-fpr 0.005   # CI gate
 uv run cubic eval --env fintech-autonomous --min-recall 1.0 --max-fpr 0.0
+uv run cubic eval --env saas-autonomous --min-recall 1.0 --max-fpr 0.0
+uv run cubic remediate --env saas --require-verified
 ```
 
 ## Milestone 1 layout
@@ -91,14 +93,72 @@ The plan covers 20 of the 23 synthesized invariants (18 before Milestone 4's per
 let it confirm which wallets are funded). The other three are reported as uncovered, each with a
 reason. For example, `disburse` can't succeed at step 0 from the observed seeded state.
 
+## Milestone 4: grounding, a second gym, and the closed remediation loop
+
+### Persona grounding (`cubic.compiler.grounding`, `cubic.search.readiness`)
+
+At compile time, each persona sends authenticated `GET`s to the read routes whose path
+parameters bind to its own resources. The scalar fields of each response are stored in
+`ActorPersona.observed_state`, with credential-like fields dropped. `HeuristicGraphPolicy`
+then ranks personas by observed *state readiness* instead of breaking ties on persona id:
+
+- **Ledger:** the account the actor's request touches can cover the amount. This picks
+  funded wallets or workspaces with free seats.
+- **Lifecycle:** the resource's observed status replaces the "seeded = initial state"
+  assumption. A lifecycle skip on an already-ACTIVE subscription is not a skip.
+- **Preconditions:** data preconditions from static guards (`billing_status == VERIFIED`) are
+  checked against the records of the caller and of the resource owner.
+
+`HeuristicGraphPolicy(use_observed_state=False)` reproduces the Milestone 3 behaviour for ablations.
+
+### Second gym: multi-tenant SaaS (`cubic.gym.saas`)
+
+Workspaces with a seat allocation tracked in a ledger, members, API keys, and subscriptions
+with a `TRIALING -> ACTIVE` lifecycle. It has four toggleable defects: cross-tenant workspace
+read, a seat-limit race on invites, a subscription upgrade that skips activation, and a
+negative seat-purchase regression. It has no hand-written graph, no probes and no app-specific
+rules. The compiler derives 10 edges and 31 invariants from source plus runtime, including the
+seat ledger, the lifecycle and the billing precondition. The personas are seeded so that the
+lexicographically first owner is *not* ready: no free seats, already ACTIVE, billing pending.
+
+| Autonomous plan, 6 builds each | Recall@1 | FPR |
+| :--- | ---: | ---: |
+| fintech, grounded | 100% (8/8) | 0% (0/112) |
+| SaaS, grounded | 100% (8/8) | 0% (0/172) |
+| SaaS, ungrounded (M3 tie-breaking) | 75% (6/8) | 2.7% (4/148) |
+
+On fintech the ungrounded policy also scores 100%/0%, because its id tie-break happens to
+land on a funded persona. The SaaS seeds are arranged so that it doesn't.
+
+### Closed-loop remediation (`cubic.remediate`)
+
+| Module | Role |
+| :--- | :--- |
+| `patcher.py` | `RulePatcher`: deterministic AST rewrites keyed on the violated oracle. `schema_lower_bound` adds `Field(gt=0)` to the body-model field the invariant names. `bypassed_guard` re-enables a guard disabled by a feature-flag or configuration conjunct, if it raises a status the invariant expects. `locked_branch` keeps the lock-protected read-modify-write. `LLMPatcher` sends a line-numbered AST slice (handler, helpers, request models) and the trace, without credentials, to any `PatchModel`, and applies the unified diff it returns. |
+| `verify_fix.py` | Imports the patched source from an isolated temporary copy and rebuilds the app with the same bug toggles. The confirmed exploit must show **0/3** violations, and every functional QA test that passed before must still pass. Anything else is `exploit_reproduces`, `functional_regression` or `patch_invalid`. |
+| `exporter.py` | Writes `test_regression_<invariant>.py`, a standalone pytest file (pytest + httpx + your app, no Cubic import). It replays the trace, with barrier-synchronized concurrency where needed, and asserts the invariant inline. |
+| `pipeline.py` | `cubic remediate`: compile → search → 3-of-3 verify → patch + gate → export. It also checks each exported test: it must fail on the unpatched build and pass on the patched code. |
+
+Across both gyms and every build with planted bugs, **16/16 findings get a verified patch, each
+on the first candidate**, and all 16 exported regression tests are valid. The full loop on the
+all-bugs build takes about 1.5 s (fintech) and 2.0 s (SaaS) on an M4 Pro. Verified `.patch` files
+apply with `git apply --directory=src`.
+
+The rule patcher fixes the planted defect *shapes*: an input field with no lower bound, a guard
+that a flag can switch off, and an unlocked read-modify-write next to a locked one. A guard that
+was deleted outright, rather than switched off, needs the `LLMPatcher` (or a person). The gate
+applies the same way to every patcher.
+
 ### CLI
 
 ```bash
+uv run cubic remediate --env fintech|saas [--variant vulnerable] [--out-dir regression_tests] [--patch-dir patches] [--json report.json] [--require-verified]
+uv run cubic compile ... [--no-ground]   # skip persona grounding
 uv run cubic search [--env fintech-compiled | --graph graph.json] [--per-invariant 1] [--json plan.json]
 uv run cubic eval --env fintech-autonomous   # search-generated plan, scored on all 6 builds
 uv run cubic compile cubic.gym.fintech.app:create_app --out graph.json [--personas actors.json] [--report report.json]
 uv run cubic compile path/to/app.py[:attr]   # module path or file; app instance or factory
-uv run cubic eval [--env fintech|fintech-compiled|fintech-autonomous] [--runs 3] [--json reports/eval.json]
+uv run cubic eval [--env fintech|fintech-compiled|fintech-autonomous|saas-compiled|saas-autonomous] [--runs 3] [--json reports/eval.json]
 uv run cubic graph            # dump the testbed State Graph
 uv run cubic schema           # dump the State Graph JSON Schema
 ```

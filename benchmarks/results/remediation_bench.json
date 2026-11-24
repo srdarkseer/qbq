@@ -1,0 +1,378 @@
+{
+  "benchmark": "remediation",
+  "cubic_version": "0.1.0",
+  "runs_per_candidate": 3,
+  "summary": {
+    "apps": 2,
+    "recall_at_1": {
+      "fintech": 1.0,
+      "saas": 1.0
+    },
+    "false_positive_rate": {
+      "fintech": 0.0,
+      "saas": 0.0
+    },
+    "findings_remediated": 16,
+    "verified_patches": 16,
+    "patch_pass_rate": 1.0
+  },
+  "apps": {
+    "fintech": {
+      "environment": "fintech-compiled",
+      "plan_tests": 20,
+      "invariants_covered": 20,
+      "graph": {
+        "nodes": 8,
+        "edges": 7,
+        "invariants": 23
+      },
+      "detection": {
+        "grounded": {
+          "recall_at_1": 1.0,
+          "bugs_found_at_1": 8,
+          "bugs_total": 8,
+          "false_positive_rate": 0.0,
+          "false_positives": 0,
+          "negatives": 112,
+          "flaky": 0
+        },
+        "ungrounded_m3_policy": {
+          "recall_at_1": 1.0,
+          "bugs_found_at_1": 8,
+          "bugs_total": 8,
+          "false_positive_rate": 0.0,
+          "false_positives": 0,
+          "negatives": 100,
+          "flaky": 0
+        }
+      },
+      "remediation": {
+        "totals": {
+          "findings": 8,
+          "verified_patches": 8,
+          "regression_tests_valid": 8,
+          "patch_pass_rate": 1.0
+        },
+        "rules": {
+          "rule:bypassed_guard": 4,
+          "rule:locked_branch": 2,
+          "rule:schema_lower_bound": 2
+        },
+        "by_variant": {
+          "only:idor_wallet_read": {
+            "findings": 1,
+            "verified_patches": 1,
+            "patch_pass_rate": 1.0,
+            "first_attempt_pass": 1,
+            "patch_attempts": 1,
+            "regression_tests_valid": 1,
+            "fixes": {
+              "inv.tenant.read_wallet": {
+                "oracle": "forbidden",
+                "rule": "rule:bypassed_guard",
+                "source": "cubic/gym/fintech/app.py:155",
+                "exploit_violations_after": 0,
+                "functional_checks": 5,
+                "regressions": [],
+                "diff_lines": 5
+              }
+            }
+          },
+          "only:race_withdraw": {
+            "findings": 1,
+            "verified_patches": 1,
+            "patch_pass_rate": 1.0,
+            "first_attempt_pass": 1,
+            "patch_attempts": 1,
+            "regression_tests_valid": 1,
+            "fixes": {
+              "inv.ledger.conservation": {
+                "oracle": "conservation",
+                "rule": "rule:locked_branch",
+                "source": "cubic/gym/fintech/app.py:165",
+                "exploit_violations_after": 0,
+                "functional_checks": 5,
+                "regressions": [],
+                "diff_lines": 16
+              }
+            }
+          },
+          "only:loan_state_skip": {
+            "findings": 1,
+            "verified_patches": 1,
+            "patch_pass_rate": 1.0,
+            "first_attempt_pass": 1,
+            "patch_attempts": 1,
+            "regression_tests_valid": 1,
+            "fixes": {
+              "inv.lifecycle.disburse_loan": {
+                "oracle": "rejected_transition",
+                "rule": "rule:bypassed_guard",
+                "source": "cubic/gym/fintech/app.py:240",
+                "exploit_violations_after": 0,
+                "functional_checks": 5,
+                "regressions": [],
+                "diff_lines": 2
+              }
+            }
+          },
+          "only:negative_transfer": {
+            "findings": 1,
+            "verified_patches": 1,
+            "patch_pass_rate": 1.0,
+            "first_attempt_pass": 1,
+            "patch_attempts": 1,
+            "regression_tests_valid": 1,
+            "fixes": {
+              "inv.input.transfer.amount": {
+                "oracle": "rejected_input",
+                "rule": "rule:schema_lower_bound",
+                "source": "cubic/gym/fintech/app.py:185",
+                "exploit_violations_after": 0,
+                "functional_checks": 5,
+                "regressions": [],
+                "diff_lines": 2
+              }
+            }
+          },
+          "vulnerable": {
+            "findings": 4,
+            "verified_patches": 4,
+            "patch_pass_rate": 1.0,
+            "first_attempt_pass": 4,
+            "patch_attempts": 4,
+            "regression_tests_valid": 4,
+            "fixes": {
+              "inv.input.transfer.amount": {
+                "oracle": "rejected_input",
+                "rule": "rule:schema_lower_bound",
+                "source": "cubic/gym/fintech/app.py:185",
+                "exploit_violations_after": 0,
+                "functional_checks": 5,
+                "regressions": [],
+                "diff_lines": 2
+              },
+              "inv.ledger.conservation": {
+                "oracle": "conservation",
+                "rule": "rule:locked_branch",
+                "source": "cubic/gym/fintech/app.py:165",
+                "exploit_violations_after": 0,
+                "functional_checks": 5,
+                "regressions": [],
+                "diff_lines": 16
+              },
+              "inv.lifecycle.disburse_loan": {
+                "oracle": "rejected_transition",
+                "rule": "rule:bypassed_guard",
+                "source": "cubic/gym/fintech/app.py:240",
+                "exploit_violations_after": 0,
+                "functional_checks": 5,
+                "regressions": [],
+                "diff_lines": 2
+              },
+              "inv.tenant.read_wallet": {
+                "oracle": "forbidden",
+                "rule": "rule:bypassed_guard",
+                "source": "cubic/gym/fintech/app.py:155",
+                "exploit_violations_after": 0,
+                "functional_checks": 5,
+                "regressions": [],
+                "diff_lines": 5
+              }
+            }
+          }
+        }
+      }
+    },
+    "saas": {
+      "environment": "saas-compiled",
+      "plan_tests": 30,
+      "invariants_covered": 30,
+      "graph": {
+        "nodes": 6,
+        "edges": 10,
+        "invariants": 31
+      },
+      "detection": {
+        "grounded": {
+          "recall_at_1": 1.0,
+          "bugs_found_at_1": 8,
+          "bugs_total": 8,
+          "false_positive_rate": 0.0,
+          "false_positives": 0,
+          "negatives": 172,
+          "flaky": 0
+        },
+        "ungrounded_m3_policy": {
+          "recall_at_1": 0.75,
+          "bugs_found_at_1": 6,
+          "bugs_total": 8,
+          "false_positive_rate": 0.02702702702702703,
+          "false_positives": 4,
+          "negatives": 148,
+          "flaky": 0
+        }
+      },
+      "remediation": {
+        "totals": {
+          "findings": 8,
+          "verified_patches": 8,
+          "regression_tests_valid": 8,
+          "patch_pass_rate": 1.0
+        },
+        "rules": {
+          "rule:bypassed_guard": 4,
+          "rule:locked_branch": 2,
+          "rule:schema_lower_bound": 2
+        },
+        "by_variant": {
+          "only:cross_tenant_workspace_read": {
+            "findings": 1,
+            "verified_patches": 1,
+            "patch_pass_rate": 1.0,
+            "first_attempt_pass": 1,
+            "patch_attempts": 1,
+            "regression_tests_valid": 1,
+            "fixes": {
+              "inv.tenant.read_workspace": {
+                "oracle": "forbidden",
+                "rule": "rule:bypassed_guard",
+                "source": "cubic/gym/saas/app.py:190",
+                "exploit_violations_after": 0,
+                "functional_checks": 10,
+                "regressions": [],
+                "diff_lines": 5
+              }
+            }
+          },
+          "only:seat_limit_race": {
+            "findings": 1,
+            "verified_patches": 1,
+            "patch_pass_rate": 1.0,
+            "first_attempt_pass": 1,
+            "patch_attempts": 1,
+            "regression_tests_valid": 1,
+            "fixes": {
+              "inv.ledger.conservation": {
+                "oracle": "conservation",
+                "rule": "rule:locked_branch",
+                "source": "cubic/gym/saas/app.py:200",
+                "exploit_violations_after": 0,
+                "functional_checks": 10,
+                "regressions": [],
+                "diff_lines": 16
+              }
+            }
+          },
+          "only:tier_state_skip": {
+            "findings": 1,
+            "verified_patches": 1,
+            "patch_pass_rate": 1.0,
+            "first_attempt_pass": 1,
+            "patch_attempts": 1,
+            "regression_tests_valid": 1,
+            "fixes": {
+              "inv.lifecycle.upgrade_subscription": {
+                "oracle": "rejected_transition",
+                "rule": "rule:bypassed_guard",
+                "source": "cubic/gym/saas/app.py:274",
+                "exploit_violations_after": 0,
+                "functional_checks": 10,
+                "regressions": [],
+                "diff_lines": 2
+              }
+            }
+          },
+          "only:negative_seat_quantity": {
+            "findings": 1,
+            "verified_patches": 1,
+            "patch_pass_rate": 1.0,
+            "first_attempt_pass": 1,
+            "patch_attempts": 1,
+            "regression_tests_valid": 1,
+            "fixes": {
+              "inv.input.buy_seats.quantity": {
+                "oracle": "rejected_input",
+                "rule": "rule:schema_lower_bound",
+                "source": "cubic/gym/saas/app.py:222",
+                "exploit_violations_after": 0,
+                "functional_checks": 10,
+                "regressions": [],
+                "diff_lines": 4
+              }
+            }
+          },
+          "vulnerable": {
+            "findings": 4,
+            "verified_patches": 4,
+            "patch_pass_rate": 1.0,
+            "first_attempt_pass": 4,
+            "patch_attempts": 4,
+            "regression_tests_valid": 4,
+            "fixes": {
+              "inv.input.buy_seats.quantity": {
+                "oracle": "rejected_input",
+                "rule": "rule:schema_lower_bound",
+                "source": "cubic/gym/saas/app.py:222",
+                "exploit_violations_after": 0,
+                "functional_checks": 10,
+                "regressions": [],
+                "diff_lines": 4
+              },
+              "inv.ledger.conservation": {
+                "oracle": "conservation",
+                "rule": "rule:locked_branch",
+                "source": "cubic/gym/saas/app.py:200",
+                "exploit_violations_after": 0,
+                "functional_checks": 10,
+                "regressions": [],
+                "diff_lines": 16
+              },
+              "inv.lifecycle.upgrade_subscription": {
+                "oracle": "rejected_transition",
+                "rule": "rule:bypassed_guard",
+                "source": "cubic/gym/saas/app.py:274",
+                "exploit_violations_after": 0,
+                "functional_checks": 10,
+                "regressions": [],
+                "diff_lines": 2
+              },
+              "inv.tenant.read_workspace": {
+                "oracle": "forbidden",
+                "rule": "rule:bypassed_guard",
+                "source": "cubic/gym/saas/app.py:190",
+                "exploit_violations_after": 0,
+                "functional_checks": 10,
+                "regressions": [],
+                "diff_lines": 5
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "latency_s": {
+    "platform": "Darwin arm64",
+    "python": "3.11.9",
+    "remediate_vulnerable": {
+      "fintech": {
+        "compile": 0.0316,
+        "search": 0.0043,
+        "verify": 0.2454,
+        "patch_and_verify": 0.7931,
+        "export": 0.4076,
+        "total": 1.482
+      },
+      "saas": {
+        "compile": 0.0509,
+        "search": 0.0031,
+        "verify": 0.4313,
+        "patch_and_verify": 1.141,
+        "export": 0.4148,
+        "total": 2.0411
+      }
+    },
+    "benchmark_total": 23.22
+  }
+}
