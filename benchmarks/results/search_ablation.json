@@ -1,0 +1,167 @@
+{
+  "benchmark": "search_ablation",
+  "cubic_version": "0.1.0",
+  "environment": "fintech-compiled",
+  "variants": [
+    "patched",
+    "only:idor_wallet_read",
+    "only:race_withdraw",
+    "only:loan_state_skip",
+    "only:negative_transfer",
+    "vulnerable"
+  ],
+  "runs_per_candidate": 3,
+  "graph": {
+    "nodes": 8,
+    "edges": 7,
+    "actors": 5,
+    "invariants": 23
+  },
+  "pool": {
+    "size": 130,
+    "by_combinator": {
+      "boundary_perturb": 80,
+      "cross_persona": 35,
+      "lifecycle_order": 1,
+      "parallel_contention": 14
+    }
+  },
+  "guided_plan": {
+    "policy": "heuristic",
+    "config": {
+      "beam_width": 3,
+      "per_invariant": 1,
+      "max_tests": null
+    },
+    "tests": [
+      "auto:boundary_perturb:inv.input.transfer.amount:transfer:user_a.amount.negative",
+      "auto:parallel_contention:inv.ledger.conservation:withdraw:user_a.x16",
+      "auto:lifecycle_order:inv.lifecycle.disburse_loan:disburse_loan:user_c.loan_carol",
+      "auto:cross_persona:inv.tenant.approve_loan:approve_loan:merchant_admin.user_a",
+      "auto:cross_persona:inv.tenant.disburse_loan:disburse_loan:user_c.user_a",
+      "auto:cross_persona:inv.tenant.withdraw:withdraw:user_a.user_b",
+      "auto:boundary_perturb:inv.input.apply_loan.amount:apply_loan:merchant_admin.amount.negative",
+      "auto:boundary_perturb:inv.input.withdraw.amount:withdraw:user_a.amount.negative",
+      "auto:cross_persona:inv.tenant.read_wallet:read_wallet:user_a.user_b",
+      "auto:cross_persona:inv.auth.apply_loan:apply_loan:merchant_admin.anonymous",
+      "auto:cross_persona:inv.auth.approve_loan:approve_loan:merchant_admin.anonymous",
+      "auto:cross_persona:inv.auth.disburse_loan:disburse_loan:user_c.anonymous",
+      "auto:cross_persona:inv.auth.read_wallet:read_wallet:user_a.anonymous",
+      "auto:cross_persona:inv.auth.transfer:transfer:user_a.anonymous",
+      "auto:cross_persona:inv.auth.withdraw:withdraw:user_a.anonymous",
+      "auto:boundary_perturb:inv.functional.apply_loan:apply_loan:user_a.amount.min_valid",
+      "auto:boundary_perturb:inv.functional.health:health:anonymous.nominal",
+      "auto:boundary_perturb:inv.functional.read_wallet:read_wallet:user_a.nominal"
+    ],
+    "invariants_covered": 18,
+    "coverage_ratio": 0.782609,
+    "uncovered": {
+      "inv.functional.approve_loan": "all tests pruned: edge has data preconditions the graph cannot verify",
+      "inv.functional.disburse_loan": "all tests pruned: lifecycle precondition unreachable from seeded state at step 0",
+      "inv.functional.transfer": "all tests pruned: success depends on account balances the graph does not model",
+      "inv.functional.withdraw": "all tests pruned: success depends on account balances the graph does not model",
+      "inv.lifecycle.approve_loan": "combinators produced no replayable trace"
+    },
+    "stats": {
+      "nodes_expanded": 6,
+      "frames_total": 25,
+      "frames_expanded": 23,
+      "frames_rescored": 0,
+      "tests_generated": 122,
+      "tests_pruned": 29,
+      "tests_beam_dropped": 49,
+      "tests_emitted": 18
+    }
+  },
+  "fp_filtering": {
+    "guided_plan": {
+      "proposals": 18,
+      "variant_proposal_pairs": 108,
+      "pairs_targeting_broken_invariant": 8,
+      "pairs_targeting_intact_invariant": 100,
+      "unfiltered": {
+        "reported_findings": 108,
+        "true_positives": 8,
+        "false_positives": 100,
+        "precision": 0.074074,
+        "false_positive_rate": 1.0,
+        "false_discovery_rate": 0.925926
+      },
+      "verifier_gated": {
+        "reported_findings": 8,
+        "true_positives": 8,
+        "false_positives": 0,
+        "precision": 1.0,
+        "false_positive_rate": 0.0,
+        "false_discovery_rate": 0.0,
+        "filtered_out": 100,
+        "flaky_discarded": 0
+      }
+    },
+    "full_pool_no_policy": {
+      "proposals": 130,
+      "variant_proposal_pairs": 780,
+      "pairs_targeting_broken_invariant": 96,
+      "pairs_targeting_intact_invariant": 684,
+      "unfiltered": {
+        "reported_findings": 780,
+        "true_positives": 96,
+        "false_positives": 684,
+        "precision": 0.123077,
+        "false_positive_rate": 1.0,
+        "false_discovery_rate": 0.876923
+      },
+      "verifier_gated": {
+        "reported_findings": 122,
+        "true_positives": 52,
+        "false_positives": 70,
+        "precision": 0.42623,
+        "false_positive_rate": 0.102339,
+        "false_discovery_rate": 0.57377,
+        "filtered_out": 658,
+        "flaky_discarded": 0
+      }
+    }
+  },
+  "search_efficiency": {
+    "graph_guided": {
+      "budget": 18,
+      "recall_at_1": 1.0,
+      "bugs_found_at_1": 8,
+      "bugs_total": 8,
+      "false_positive_rate_gated": 0.0,
+      "false_positives_gated": 0,
+      "tests_to_full_recall": {
+        "only:idor_wallet_read": 9,
+        "only:race_withdraw": 2,
+        "only:loan_state_skip": 3,
+        "only:negative_transfer": 1,
+        "vulnerable": 9
+      }
+    },
+    "uniform_random_edge": {
+      "seeds": 200,
+      "budget": 18,
+      "recall_at_1": {
+        "mean": 0.415,
+        "median": 0.5,
+        "min": 0.0,
+        "max": 1.0
+      },
+      "runs_with_full_recall_at_1": 4,
+      "false_positive_rate_gated": {
+        "mean": 0.113323,
+        "median": 0.104167,
+        "min": 0.0,
+        "max": 0.32
+      },
+      "runs_with_any_false_positive": 189,
+      "tests_to_full_recall_vulnerable": {
+        "mean": 47.635,
+        "median": 43.0,
+        "min": 13,
+        "max": 106
+      }
+    }
+  }
+}

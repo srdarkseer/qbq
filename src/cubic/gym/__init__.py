@@ -6,16 +6,22 @@ from cubic.gym.base import Environment, GroundTruthBug, Variant
 from cubic.gym.fintech import environment as fintech_environment
 
 
-
 def _fintech_compiled() -> Environment:
     from cubic.gym.fintech.compiled import environment  # imports the compiler lazily
 
     return environment()
 
 
+def _fintech_autonomous() -> Environment:
+    from cubic.eval.autonomous import autonomous_environment
+
+    return autonomous_environment(_fintech_compiled(), name="fintech-autonomous")
+
+
 ENVIRONMENTS: dict[str, Callable[[], Environment]] = {
     "fintech": fintech_environment,
     "fintech-compiled": _fintech_compiled,
+    "fintech-autonomous": _fintech_autonomous,
 }
 
 

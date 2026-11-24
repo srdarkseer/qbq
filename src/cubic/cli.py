@@ -17,7 +17,8 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command")
 
     ev = sub.add_parser("eval", help="Run the deterministic eval harness against a Bug Gym environment")
-    ev.add_argument("--env", default="fintech", help="Bug Gym environment name (default: fintech)")
+    ev.add_argument("--env", default="fintech",
+                    help="Bug Gym environment: fintech, fintech-compiled, fintech-autonomous (default: fintech)")
     ev.add_argument("--runs", type=int, default=3, help="Replays per candidate (default: 3)")
     ev.add_argument("--json", type=Path, metavar="PATH", help="Write the full JSON report to PATH")
     ev.add_argument("--min-recall", type=float, default=None, help="Fail if Recall@1 is below this")
@@ -32,6 +33,14 @@ def build_parser() -> argparse.ArgumentParser:
     co.add_argument("--app-name", default=None, help="Override the graph's app_name")
     co.add_argument("--no-invariants", action="store_true", help="Skip invariant synthesis")
     co.add_argument("--no-probe", action="store_true", help="Skip unauthenticated runtime probes")
+
+    se = sub.add_parser("search", help="Synthesize a prioritized test plan from an environment's State Graph")
+    se.add_argument("--env", default="fintech-compiled", help="Bug Gym environment (default: fintech-compiled)")
+    se.add_argument("--graph", type=Path, metavar="PATH", help="Search a StateGraph JSON file instead")
+    se.add_argument("--per-invariant", type=int, default=1, help="Tests per invariant (default: 1)")
+    se.add_argument("--beam-width", type=int, default=3, help="Tests kept per frame (default: 3)")
+    se.add_argument("--max-tests", type=int, default=None, help="Global test budget")
+    se.add_argument("--json", type=Path, metavar="PATH", help="Write the full search result JSON to PATH")
 
     gr = sub.add_parser("graph", help="Print an environment's Behavioral State Graph as JSON")
     gr.add_argument("--env", default="fintech")
@@ -59,6 +68,32 @@ def _cmd_eval(args: argparse.Namespace) -> int:
     for failure in failures:
         print(f"GATE FAILED: {failure}", file=sys.stderr)
     return 1 if failures else 0
+
+
+def _cmd_search(args: argparse.Namespace) -> int:
+    from cubic.graph import StateGraph
+    from cubic.gym import load_environment
+    from cubic.search import SearchConfig, search
+
+    graph = (StateGraph.from_json(args.graph.read_text()) if args.graph
+             else load_environment(args.env).graph)
+    config = SearchConfig(beam_width=args.beam_width, per_invariant=args.per_invariant,
+                          max_tests=args.max_tests)
+    result = search(graph, config=config)
+    for e in result.emitted:
+        print(f"{e.rank:>3}  {e.priority:6.2f}  {e.test.combinator.value:<19} {e.test.invariant_id:<34} "
+              f"{e.test.hypothesis}")
+    covered = sum(1 for c in result.coverage.values() if c.tests)
+    print(f"\n{len(result.tests)} tests covering {covered}/{len(result.coverage)} invariants "
+          f"(policy={result.policy}, {result.stats.tests_generated} generated, "
+          f"{result.stats.tests_pruned} pruned)")
+    for inv_id, reason in result.uncovered().items():
+        print(f"  uncovered {inv_id}: {reason}")
+    if args.json:
+        args.json.parent.mkdir(parents=True, exist_ok=True)
+        args.json.write_text(result.model_dump_json(indent=2) + "\n")
+        print(f"\nSearch result written to {args.json}")
+    return 0
 
 
 def _load_personas(path: Path) -> list:
@@ -114,6 +149,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _cmd_eval(args)
     if args.command == "compile":
         return _cmd_compile(args)
+    if args.command == "search":
+        return _cmd_search(args)
     if args.command == "graph":
         from cubic.gym import load_environment
 

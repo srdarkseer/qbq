@@ -1,5 +1,6 @@
 """Evaluation harness: Recall@1 and False Positive Rate against ground truth."""
 
+from cubic.eval.autonomous import autonomous_environment, plan_for
 from cubic.eval.harness import (
     CaseResult,
     EvalReport,
@@ -15,7 +16,9 @@ __all__ = [
     "EvalReport",
     "Metrics",
     "arun_eval",
+    "autonomous_environment",
     "compute_metrics",
     "format_report",
+    "plan_for",
     "run_eval",
 ]
