@@ -73,7 +73,9 @@ class SourceContext:
 
     def numbered(self, node: ast.AST) -> str:
         lines = self.text.splitlines()
-        start, end = node.lineno, node.end_lineno or node.lineno
+        decorators = getattr(node, "decorator_list", [])  # include @router.get(...) lines models must diff against
+        start = min([node.lineno, *(d.lineno for d in decorators)])
+        end = node.end_lineno or node.lineno
         return "\n".join(f"{n:>5}  {lines[n - 1]}" for n in range(start, end + 1))
 
 
@@ -442,39 +444,60 @@ class RulePatcher:
 _HUNK = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")
 
 
-def apply_unified_diff(source: str, diff: str) -> str:
-    """Apply a single-file unified diff. Context must match exactly; hunks may drift."""
+def _locate(lines: list[str], old: list[str], guess: int) -> int | None:
+    positions = [i for i in range(len(lines) - len(old) + 1) if lines[i: i + len(old)] == old]
+    return min(positions, key=lambda i: abs(i - guess)) if positions else None
+
+
+def _hunk_with_fuzz(lines: list[str], ops: list[tuple[str, str]], guess: int, fuzz: int
+                    ) -> tuple[int, list[str], list[str]] | None:
+    """Locate a hunk, dropping up to ``fuzz`` unmatched *context* lines from each end (like ``patch -F``).
+
+    Removed and added lines are never fuzzed: only surrounding context may be imprecise.
+    """
+    lead = next((i for i, (k, _) in enumerate(ops) if k != " "), len(ops))
+    trail = next((i for i, (k, _) in enumerate(reversed(ops)) if k != " "), len(ops))
+    for f in range(fuzz + 1):
+        for drop_lead in range(min(f, lead) + 1):
+            drop_trail = min(f - drop_lead, trail)
+            core = ops[drop_lead: len(ops) - drop_trail]
+            old = [t for k, t in core if k != "+"]
+            new = [t for k, t in core if k != "-"]
+            if not old:
+                continue
+            at = _locate(lines, old, guess + drop_lead)
+            if at is not None:
+                return at, old, new
+    return None
+
+
+def apply_unified_diff(source: str, diff: str, *, fuzz: int = 2) -> str:
+    """Apply a single-file unified diff. Hunks may drift, and outer context may be fuzzed."""
     lines = source.splitlines(keepends=True)
-    hunks: list[tuple[int, list[str], list[str]]] = []
-    current: tuple[int, list[str], list[str]] | None = None
+    hunks: list[tuple[int, list[tuple[str, str]]]] = []
+    current: tuple[int, list[tuple[str, str]]] | None = None
     for raw in diff.splitlines(keepends=True):
         if raw.startswith(("---", "+++")) and current is None:
             continue
         if m := _HUNK.match(raw):
-            current = (int(m.group(1)), [], [])
+            current = (int(m.group(1)), [])
             hunks.append(current)
             continue
         if current is None or raw.startswith("\\"):
             continue
+        kind = raw[:1] if raw[:1] in {" ", "-", "+"} else " "
         body = raw[1:] if raw[:1] in {" ", "-", "+"} else raw
         if not body.endswith("\n"):
             body += "\n"
-        if raw.startswith("-"):
-            current[1].append(body)
-        elif raw.startswith("+"):
-            current[2].append(body)
-        else:
-            current[1].append(body)
-            current[2].append(body)
+        current[1].append((kind, body))
     if not hunks:
         raise PatchError("no hunks in diff")
     offset = 0
-    for start, old, new in hunks:
-        guess = max(start - 1 + offset, 0)
-        positions = [i for i in range(len(lines) - len(old) + 1) if lines[i: i + len(old)] == old]
-        if not positions:
-            raise PatchError(f"hunk at line {start} does not match the source")
-        at = min(positions, key=lambda i: abs(i - guess))
+    for start_line, ops in hunks:
+        located = _hunk_with_fuzz(lines, ops, max(start_line - 1 + offset, 0), fuzz)
+        if located is None:
+            raise PatchError(f"hunk at line {start_line} does not match the source")
+        at, old, new = located
         lines[at: at + len(old)] = new
         offset += len(new) - len(old)
     return "".join(lines)

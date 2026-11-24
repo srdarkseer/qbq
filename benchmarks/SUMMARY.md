@@ -52,7 +52,7 @@ Across all apps: **24/24** findings get a patch that passes the gate. The gate r
 | train | fintech | 866 | 28 | 44 | 694 | 128 | -0.097 | +0.067 | -0.376 |
 | eval | agent_gateway, saas | 1289 | 71 | 54 | 1054 | 181 | -0.099 | +0.043 | -0.220 |
 
-2155 trajectories (sha256 `ef1d14b99d87ed41`), 3 replays per verification. Shared prompts across splits: 0. Rewards: `true_violation` +1.0, `patch_verified` +1.0, `holds` +0.0, `false_positive` -1.0, `flaky` -1.0, `malformed` -1.0, `patch_rejected` -1.0. The gap between search-plan and policy-pruned rows means the heuristic policy's choices already line up with the verifiable reward, which makes it a reasonable initial policy for RL fine-tuning.
+2155 trajectories (sha256 `d1354d0f504df4a4`), 3 replays per verification. Shared prompts across splits: 0. Rewards: `true_violation` +1.0, `patch_verified` +1.0, `holds` +0.0, `false_positive` -1.0, `flaky` -1.0, `malformed` -1.0, `patch_rejected` -1.0. The gap between search-plan and policy-pruned rows means the heuristic policy's choices already line up with the verifiable reward, which makes it a reasonable initial policy for RL fine-tuning.
 
 ## 5. Compiler (fintech)
 

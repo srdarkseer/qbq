@@ -193,3 +193,29 @@ def test_cli_remediate_live_flags_with_mocked_transport(tmp_path, monkeypatch, c
     assert "+async def read_invoice(order: OwnedOrder, store: StoreDep)" in patch_file.read_text()
     for text in (out.out, out.err, report.read_text(), patch_file.read_text()):
         assert KEY not in text
+
+
+def test_model_diff_with_imprecise_context_applies_and_prompt_shows_decorators(env):
+    """Regression from a live Gemini run: the reply wrote blank lines where the decorator sits."""
+    from qbq.remediate import ConfirmedFinding, build_patch_prompt, load_context
+    from qbq.remediate.patcher import PatchError, apply_unified_diff
+
+    source = ORDERS.read_text()
+    live_reply = (
+        "--- a/storefront/routers/orders.py\n+++ b/storefront/routers/orders.py\n@@ -32,9 +32,7 @@\n \n \n"
+        + "".join("-" + line for line in BUGGY_INVOICE.splitlines(keepends=True))
+        + "+" + FIXED_INVOICE
+        + '     customer = store.users[order["customer_id"]]\n'
+    )
+    patched = apply_unified_diff(source, live_reply)
+    assert '@router.get("/{order_id}/invoice", response_model=InvoiceOut)\n' + FIXED_INVOICE in patched
+    with pytest.raises(PatchError):  # fuzz never relaxes the lines being changed
+        apply_unified_diff(source, live_reply.replace("-    order = store.orders.get(order_id)",
+                                                      "-    order = store.orders.fetch(order_id)"))
+    plan = search(env.graph)
+    candidate = next(c for c in plan.candidates() if c.invariant_id == "inv.tenant.read_invoice")
+    result = DeterministicVerifier(env.graph, lambda: env.build_app(frozenset()), env.snapshot,
+                                   runs=1).verify(candidate)
+    finding = ConfirmedFinding.from_verification(env.graph, candidate, result)
+    prompt = build_patch_prompt(finding, load_context(finding, env.app_source))
+    assert '@router.get("/{order_id}/invoice", response_model=InvoiceOut)' in prompt.ast_slice

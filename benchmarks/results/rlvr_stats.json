@@ -12,7 +12,7 @@
   },
   "runs_per_verification": 3,
   "rows": 2155,
-  "sha256": "ef1d14b99d87ed41da25c2da26a727625834e009e8fd7cf6e8dacc36712b92b8",
+  "sha256": "d1354d0f504df4a4a61422099ec3c8a97581587ebcff51ab00699753236ab35c",
   "leakage": {
     "shared_prompts": 0,
     "shared_envs": [],
@@ -109,6 +109,6 @@
     "path": "datasets/qbq_rlvr_sample.jsonl",
     "rows": 24,
     "per_stratum": 2,
-    "sha256": "96624fb73569632b8da4248084dfb4e0f1f03d5fb13949ceb6570ce235714138"
+    "sha256": "5ee4cfa6132ce58a9333e58b19489c92fbb09c647433efd5582768fee138fc14"
   }
 }
