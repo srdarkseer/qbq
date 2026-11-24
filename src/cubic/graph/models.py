@@ -142,10 +142,20 @@ class ActorPersona(_Frozen):
         default_factory=dict,
         description="Resource ids this persona legitimately owns, keyed by entity name.",
     )
+    observed_state: dict[str, dict[str, dict[str, Any]]] = Field(
+        default_factory=dict,
+        description=(
+            "Initial attributes of owned resources observed at compile time, keyed by entity name "
+            "then resource id (e.g. {'wallets': {'w_1': {'balance': 100}}}). Scalars only."
+        ),
+    )
 
     @property
     def is_authenticated(self) -> bool:
         return self.auth_token is not None
+
+    def observed(self, entity: str, resource_id: str) -> dict[str, Any] | None:
+        return self.observed_state.get(entity, {}).get(resource_id)
 
     def auth_headers(self) -> dict[str, str]:
         return {"Authorization": f"Bearer {self.auth_token}"} if self.auth_token else {}

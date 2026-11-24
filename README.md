@@ -78,18 +78,18 @@ The policy's guard-aware pruning removes these, so the two layers are complement
 
 | Fintech testbed, 6 builds | Proposals | Reported | False positives |
 | :--- | ---: | ---: | ---: |
-| Guided plan, unfiltered | 18 | 108 | 100 (FDR 92.6%) |
-| Guided plan, verifier-gated | 18 | 8 | **0** |
+| Guided plan, unfiltered | 20 | 120 | 112 (FDR 93.3%) |
+| Guided plan, verifier-gated | 20 | 8 | **0** |
 | Full combinator pool, verifier-gated (no policy) | 130 | 122 | 70 (FPR 10.2%) |
 
-Guided search reaches Recall@1 100% (8/8). Uniform random edge sampling with the same 18-test
-budget averages 41.5% over 200 seeds. In the all-bugs build, guided search finds every bug
+Guided search reaches Recall@1 100% (8/8). Uniform random edge sampling with the same 20-test
+budget averages 43.0% over 200 seeds. In the all-bugs build, guided search finds every bug
 within 9 verified tests; random sampling needs 47.6 on average. Full numbers are in
 [`benchmarks/results/search_ablation.json`](benchmarks/results/search_ablation.json).
 
-The plan covers 18 of the 23 synthesized invariants. Five are reported as uncovered, each with
-a reason. Examples: `disburse` can't succeed at step 0 from seeded state, and withdraw/transfer
-success depends on account balances the graph doesn't model.
+The plan covers 20 of the 23 synthesized invariants (18 before Milestone 4's persona grounding
+let it confirm which wallets are funded). The other three are reported as uncovered, each with a
+reason. For example, `disburse` can't succeed at step 0 from the observed seeded state.
 
 ### CLI
 

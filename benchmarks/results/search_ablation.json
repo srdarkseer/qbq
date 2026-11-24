@@ -49,17 +49,17 @@
       "auto:cross_persona:inv.auth.read_wallet:read_wallet:user_a.anonymous",
       "auto:cross_persona:inv.auth.transfer:transfer:user_a.anonymous",
       "auto:cross_persona:inv.auth.withdraw:withdraw:user_a.anonymous",
-      "auto:boundary_perturb:inv.functional.apply_loan:apply_loan:user_a.amount.min_valid",
+      "auto:boundary_perturb:inv.functional.apply_loan:apply_loan:user_a.nominal",
       "auto:boundary_perturb:inv.functional.health:health:anonymous.nominal",
-      "auto:boundary_perturb:inv.functional.read_wallet:read_wallet:user_a.nominal"
+      "auto:boundary_perturb:inv.functional.read_wallet:read_wallet:user_a.nominal",
+      "auto:boundary_perturb:inv.functional.transfer:transfer:user_a.nominal",
+      "auto:boundary_perturb:inv.functional.withdraw:withdraw:user_a.nominal"
     ],
-    "invariants_covered": 18,
-    "coverage_ratio": 0.782609,
+    "invariants_covered": 20,
+    "coverage_ratio": 0.869565,
     "uncovered": {
       "inv.functional.approve_loan": "all tests pruned: edge has data preconditions the graph cannot verify",
       "inv.functional.disburse_loan": "all tests pruned: lifecycle precondition unreachable from seeded state at step 0",
-      "inv.functional.transfer": "all tests pruned: success depends on account balances the graph does not model",
-      "inv.functional.withdraw": "all tests pruned: success depends on account balances the graph does not model",
       "inv.lifecycle.approve_loan": "combinators produced no replayable trace"
     },
     "stats": {
@@ -68,24 +68,24 @@
       "frames_expanded": 23,
       "frames_rescored": 0,
       "tests_generated": 122,
-      "tests_pruned": 29,
-      "tests_beam_dropped": 49,
-      "tests_emitted": 18
+      "tests_pruned": 27,
+      "tests_beam_dropped": 47,
+      "tests_emitted": 20
     }
   },
   "fp_filtering": {
     "guided_plan": {
-      "proposals": 18,
-      "variant_proposal_pairs": 108,
+      "proposals": 20,
+      "variant_proposal_pairs": 120,
       "pairs_targeting_broken_invariant": 8,
-      "pairs_targeting_intact_invariant": 100,
+      "pairs_targeting_intact_invariant": 112,
       "unfiltered": {
-        "reported_findings": 108,
+        "reported_findings": 120,
         "true_positives": 8,
-        "false_positives": 100,
-        "precision": 0.074074,
+        "false_positives": 112,
+        "precision": 0.066667,
         "false_positive_rate": 1.0,
-        "false_discovery_rate": 0.925926
+        "false_discovery_rate": 0.933333
       },
       "verifier_gated": {
         "reported_findings": 8,
@@ -94,7 +94,7 @@
         "precision": 1.0,
         "false_positive_rate": 0.0,
         "false_discovery_rate": 0.0,
-        "filtered_out": 100,
+        "filtered_out": 112,
         "flaky_discarded": 0
       }
     },
@@ -125,7 +125,7 @@
   },
   "search_efficiency": {
     "graph_guided": {
-      "budget": 18,
+      "budget": 20,
       "recall_at_1": 1.0,
       "bugs_found_at_1": 8,
       "bugs_total": 8,
@@ -141,21 +141,21 @@
     },
     "uniform_random_edge": {
       "seeds": 200,
-      "budget": 18,
+      "budget": 20,
       "recall_at_1": {
-        "mean": 0.415,
+        "mean": 0.43,
         "median": 0.5,
         "min": 0.0,
         "max": 1.0
       },
       "runs_with_full_recall_at_1": 4,
       "false_positive_rate_gated": {
-        "mean": 0.113323,
-        "median": 0.104167,
+        "mean": 0.11413,
+        "median": 0.107143,
         "min": 0.0,
-        "max": 0.32
+        "max": 0.290909
       },
-      "runs_with_any_false_positive": 189,
+      "runs_with_any_false_positive": 192,
       "tests_to_full_recall_vulnerable": {
         "mean": 47.635,
         "median": 43.0,

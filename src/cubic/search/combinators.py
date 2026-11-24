@@ -382,9 +382,15 @@ def prerequisite_path(graph: StateGraph, start: str, goal: str) -> tuple[str, ..
 
 
 def required_state(graph: StateGraph, edge: TransitionEdge) -> tuple[str, str] | None:
-    """``(entity, source_node_id)`` if ``edge`` only makes sense from one entity state."""
+    """``(entity, source_node_id)`` if ``edge`` only makes sense from one entity state.
+
+    That is a transition out of an entity state, or a self-loop on one guarded by an
+    explicit state requirement (e.g. ``upgrade`` requires ACTIVE and stays ACTIVE).
+    """
     source = graph.node(edge.source)
-    if source.kind is not NodeKind.ENTITY_STATE or edge.source == edge.target:
+    if source.kind is not NodeKind.ENTITY_STATE:
+        return None
+    if edge.source == edge.target and not (edge.metadata.get("guards") or {}).get("state_requires"):
         return None
     return source.entity or "", source.id
 
@@ -562,9 +568,9 @@ def boundary_perturb(
 ) -> ProposedTest | None:
     """Send ``actor``'s nominal request with ``field`` set to a ``case`` boundary value.
 
-    ``field=None`` with ``BoundaryCase.NOMINAL`` sends the unmodified request. That
-    is the functional baseline for edges without a payload. Invalid cases target
-    input-rejection invariants. Valid cases target functional success invariants.
+    ``field=None`` with ``BoundaryCase.NOMINAL`` sends the unmodified request: the
+    functional baseline for every edge. Invalid cases target input-rejection
+    invariants. Valid cases target functional success invariants.
     """
     nominal = nominal_step(graph, edge, actor)
     if nominal is None:
@@ -575,7 +581,7 @@ def boundary_perturb(
     body = None if nominal.body is None else dict(nominal.body)
     value: Any = None
     if field is None:
-        if case is not BoundaryCase.NOMINAL or body is not None:
+        if case is not BoundaryCase.NOMINAL:
             return None
     else:
         if body is None or field not in _properties(edge):
@@ -647,8 +653,7 @@ def _expand(
     elif kind is CombinatorKind.BOUNDARY_PERTURB:
         props = _properties(edge)
         for actor in actors:
-            if not props:
-                yield boundary_perturb(graph, edge, invariant, actor, None, BoundaryCase.NOMINAL)
+            yield boundary_perturb(graph, edge, invariant, actor, None, BoundaryCase.NOMINAL)
             for name, prop in props.items():
                 cases = boundary_values(prop, name in _required(edge))
                 for case in cases:

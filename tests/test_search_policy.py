@@ -88,13 +88,31 @@ def test_success_probes_with_unmet_preconditions_are_pruned():
     cases = {
         ("inv.functional.disburse_loan", "edge.disburse_loan"): "lifecycle precondition",
         ("inv.functional.approve_loan", "edge.approve_loan"): "data preconditions",
-        ("inv.functional.withdraw", "edge.withdraw"): "account balances",
     }
     for (inv, edge), reason in cases.items():
         ranked = _ranked(inv, edge, CombinatorKind.BOUNDARY_PERTURB)
         assert ranked and all(s.pruned and reason in s.pruned for s in ranked), inv
     apply = _ranked("inv.functional.apply_loan", "edge.apply_loan", CombinatorKind.BOUNDARY_PERTURB)
     assert {s.test.features["actor"] for s in apply if s.pruned} == {"merchant_admin"}
+
+
+def test_ledger_success_probes_follow_observed_balances():
+    grounded = _ranked("inv.functional.withdraw", "edge.withdraw", CombinatorKind.BOUNDARY_PERTURB)
+    live = {s.test.features["actor"] for s in grounded if not s.pruned}
+    assert live == {"user_a", "user_b"}  # funded wallets
+    carol = [s for s in grounded if s.test.features["actor"] == "user_c"]
+    assert carol and all("w_carol.balance=0 cannot cover" in s.pruned for s in carol)
+    # without grounding, balances are unknown and every ledger success probe is pruned
+    ungrounded = _ranked("inv.functional.withdraw", "edge.withdraw", CombinatorKind.BOUNDARY_PERTURB,
+                         HeuristicGraphPolicy(use_observed_state=False))
+    assert ungrounded and all("account balances" in s.pruned for s in ungrounded)
+
+
+def test_contention_prunes_unfunded_accounts():
+    ranked = _ranked("inv.ledger.conservation", "edge.withdraw", CombinatorKind.PARALLEL_CONTENTION)
+    assert {s.test.features["actor"] for s in ranked if s.pruned} == {"user_c"}
+    assert ranked[0].test.features["actor"] in {"user_a", "user_b"}
+    assert "funded account" in ranked[0].rationale
 
 
 def test_input_probes_only_perturb_referenced_fields():

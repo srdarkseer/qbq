@@ -33,6 +33,8 @@ def build_parser() -> argparse.ArgumentParser:
     co.add_argument("--app-name", default=None, help="Override the graph's app_name")
     co.add_argument("--no-invariants", action="store_true", help="Skip invariant synthesis")
     co.add_argument("--no-probe", action="store_true", help="Skip unauthenticated runtime probes")
+    co.add_argument("--no-ground", action="store_true",
+                    help="Skip persona grounding (authenticated reads of each persona's own resources)")
 
     se = sub.add_parser("search", help="Synthesize a prioritized test plan from an environment's State Graph")
     se.add_argument("--env", default="fintech-compiled", help="Bug Gym environment (default: fintech-compiled)")
@@ -115,7 +117,7 @@ def _cmd_compile(args: argparse.Namespace) -> int:
     personas = _load_personas(args.personas) if args.personas else []
     result = compile_app(
         factory, app_name=args.app_name, personas=personas,
-        synthesize=not args.no_invariants, probe=not args.no_probe,
+        synthesize=not args.no_invariants, probe=not args.no_probe, ground=not args.no_ground,
     )
     r = result.report
     graph_json = result.graph.to_json()
@@ -130,7 +132,8 @@ def _cmd_compile(args: argparse.Namespace) -> int:
     summary = sys.stdout if args.out else sys.stderr
     print(
         f"compiled {r.app_name}: {r.routes_compiled}/{r.routes_total} routes "
-        f"({r.route_coverage:.0%} coverage), {r.nodes} nodes, {r.edges} edges, {r.invariants} invariants\n"
+        f"({r.route_coverage:.0%} coverage), {r.nodes} nodes, {r.edges} edges, {r.invariants} invariants, "
+        f"{r.grounded_records} grounded records\n"
         f"  latency {r.timings_s['total'] * 1000:.1f} ms | source {r.source_bytes} B -> graph "
         f"{r.graph_bytes} B (structural {r.structural_graph_bytes} B)",
         file=summary,

@@ -17,13 +17,13 @@
   "bytes": {
     "source": 10679,
     "openapi": 5810,
-    "compiled_graph": 13282,
-    "structural_graph": 6801
+    "compiled_graph": 13647,
+    "structural_graph": 7166
   },
   "compression": {
-    "source_over_graph": 0.8040204788435477,
-    "source_over_structural_graph": 1.5702102631965886,
-    "source_plus_openapi_over_structural_graph": 2.42449639758859
+    "source_over_graph": 0.782516303949586,
+    "source_over_structural_graph": 1.4902316494557633,
+    "source_plus_openapi_over_structural_graph": 2.301004744627407
   },
   "fidelity": {
     "structural_fidelity": 1.0,
@@ -32,24 +32,29 @@
   },
   "latency": {
     "dynamic": {
-      "median_ms": 24.026833998505026,
-      "p95_ms": 43.37237501749769,
-      "min_ms": 20.963417016901076
+      "median_ms": 22.48962497105822,
+      "p95_ms": 38.56241703033447,
+      "min_ms": 20.54658398265019
     },
     "static": {
-      "median_ms": 4.633624979760498,
-      "p95_ms": 5.186667025554925,
-      "min_ms": 3.9990830118767917
+      "median_ms": 4.526665958110243,
+      "p95_ms": 5.105790973175317,
+      "min_ms": 4.0137500036507845
     },
     "merge_and_synthesis": {
-      "median_ms": 0.510083045810461,
-      "p95_ms": 0.9959999588318169,
-      "min_ms": 0.3813750226981938
+      "median_ms": 0.4618330276571214,
+      "p95_ms": 0.5206670030020177,
+      "min_ms": 0.3873750101774931
+    },
+    "grounding": {
+      "median_ms": 3.3658749889582396,
+      "p95_ms": 3.9342499803751707,
+      "min_ms": 3.069291007705033
     },
     "total": {
-      "median_ms": 29.385667003225535,
-      "p95_ms": 48.59408299671486,
-      "min_ms": 25.529958016704768
+      "median_ms": 31.127791036851704,
+      "p95_ms": 48.12312498688698,
+      "min_ms": 28.38916698237881
     }
   }
 }

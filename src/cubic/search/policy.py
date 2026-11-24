@@ -49,8 +49,16 @@ from cubic.search.combinators import (
     classify_invariant,
     initial_state_node,
     prerequisite_path,
+    probe_step,
     required_state,
     resource_stem,
+)
+from cubic.search.readiness import (
+    Readiness,
+    ledger_readiness,
+    observed_state_of,
+    precondition_readiness,
+    required_state_value,
 )
 
 
@@ -181,9 +189,18 @@ def _unreachable_from_seed(graph: StateGraph, edge: TransitionEdge) -> bool:
 
 
 class HeuristicGraphPolicy:
-    """Deterministic, guard-aware scoring. Makes no external calls."""
+    """Deterministic, guard-aware scoring. Makes no external calls.
 
-    name = "heuristic"
+    With ``use_observed_state`` (the default), personas are ranked by state
+    readiness from compile-time grounding: funded accounts, the resource's
+    observed lifecycle state, and observed data preconditions. Without it the
+    policy behaves like Milestone 3. It assumes seeded resources are in their
+    initial state, and ties between equally scored personas break on id.
+    """
+
+    def __init__(self, *, use_observed_state: bool = True) -> None:
+        self.use_observed_state = use_observed_state
+        self.name = "heuristic" if use_observed_state else "heuristic-ungrounded"
 
     # -- frames ------------------------------------------------------------------
 
@@ -252,6 +269,13 @@ class HeuristicGraphPolicy:
 
         elif test.combinator is CombinatorKind.PARALLEL_CONTENTION:
             score = 0.5
+            if self.use_observed_state:
+                fact = ledger_readiness(graph, edge, test.trace.steps[0])
+                if fact.status is Readiness.NOT_READY:
+                    pruned = f"not state-ready: {fact.reason}"
+                elif fact.ready:
+                    score += 0.5
+                    why.append(fact.reason)
             if _binds_ledger_account(graph, edge):
                 score += 1.0
                 why.append("contends on a single ledger account")
@@ -268,11 +292,24 @@ class HeuristicGraphPolicy:
             else:
                 score, why = 0.3, ["non-owner (no ownership guard extracted)"]
             score += 0.2 * len(f["skipped_edges"])
+            if self.use_observed_state and pruned is None:
+                step = test.trace.steps[probe_step(invariant)]
+                observed, required = observed_state_of(graph, edge, step), required_state_value(graph, edge)
+                if observed is not None and observed == required:
+                    pruned = f"resource already observed in required state {required}; not an ordering skip"
+                elif observed is not None:
+                    score += 0.5
+                    why.append(f"observed upstream state {observed}")
+                # prefer personas that satisfy the skipped edges' own preconditions, so the
+                # only reason the call is out of order is the skipped transition itself
+                for skipped in f["skipped_edges"]:
+                    if precondition_readiness(graph, graph.edge(skipped), step).ready:
+                        score += 0.1
 
         elif test.combinator is CombinatorKind.BOUNDARY_PERTURB:
             case = BoundaryCase(f["case"])
             if test.oracle is Oracle.SUCCESS:
-                pruned = self._success_infeasible(graph, edge, test)
+                pruned = self._success_infeasible(graph, edge, test, grounded=self.use_observed_state)
                 score = _VALID_CASES.get(case, 0.0)
             else:
                 field = f["field"]
@@ -286,16 +323,31 @@ class HeuristicGraphPolicy:
         return ScoredTest(test=test, score=max(score, 0.0), pruned=pruned, rationale="; ".join(why))
 
     @staticmethod
-    def _success_infeasible(graph: StateGraph, edge: TransitionEdge, test: ProposedTest) -> str | None:
+    def _success_infeasible(
+        graph: StateGraph, edge: TransitionEdge, test: ProposedTest, *, grounded: bool
+    ) -> str | None:
         actor = graph.actor(test.features["actor"])
-        if _unreachable_from_seed(graph, edge):
+        step = test.trace.steps[0]
+        observed = observed_state_of(graph, edge, step) if grounded else None
+        required = required_state_value(graph, edge)
+        if observed is not None and required is not None:
+            if observed != required:
+                return f"resource observed in state {observed}; edge requires {required}"
+        elif _unreachable_from_seed(graph, edge):
             return "lifecycle precondition unreachable from seeded state at step 0"
         if _guards(edge).get("preconditions"):
-            return "edge has data preconditions the graph cannot verify"
+            fact = precondition_readiness(graph, edge, step) if grounded else None
+            if fact is None or not fact.ready:
+                return ("edge has data preconditions the graph cannot verify" if fact is None
+                        or fact.status is Readiness.UNKNOWN else f"not state-ready: {fact.reason}")
         if edge.auth_required and not actor.owned_resources:
             return f"{actor.id} owns no seeded resources; not a representative principal"
         if _ledger_coupled(graph, edge):
-            return "success depends on account balances the graph does not model"
+            fact = ledger_readiness(graph, edge, step) if grounded else None
+            if fact is None or fact.status is Readiness.UNKNOWN:
+                return "success depends on account balances the graph does not model"
+            if not fact.ready:
+                return f"not state-ready: {fact.reason}"
         return None
 
 
@@ -380,7 +432,8 @@ def graph_slice(graph: StateGraph, edge_id: str) -> dict[str, Any]:
         "adjacent_edges": [_edge_summary(graph.edge(e), detail=False) for e in adjacent],
         "actors": [
             {"id": a.id, "role": a.role, "authenticated": a.is_authenticated,
-             "owns": {k: sorted(v) for k, v in sorted(a.owned_resources.items())}}
+             "owns": {k: sorted(v) for k, v in sorted(a.owned_resources.items())},
+             "observed_state": a.observed_state}
             for a in sorted(graph.actors, key=lambda a: a.id)
         ],
     }

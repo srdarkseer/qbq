@@ -12,7 +12,7 @@ from functools import cache
 
 from cubic.compiler import compile_app
 from cubic.graph import StateGraph
-from cubic.gym.base import Environment, GroundTruthBug
+from cubic.gym.base import AppSource, Environment, GroundTruthBug
 from cubic.gym.fintech import app as testbed
 from cubic.gym.fintech.graph import build_graph
 from cubic.gym.fintech.manifest import BUGS, baseline_candidates
@@ -93,4 +93,5 @@ def environment() -> Environment:
         build_app=lambda active: testbed.create_app(active),
         snapshot=testbed.snapshot,
         baseline_candidates=candidates,
+        app_source=AppSource(module="cubic.gym.fintech.app"),
     )

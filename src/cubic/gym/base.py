@@ -30,6 +30,19 @@ class Variant:
 
 
 @dataclass(frozen=True)
+class AppSource:
+    """Where an environment's application code lives, for patching and test export.
+
+    ``module`` must expose ``factory(active_bugs)`` returning an ASGI app and
+    ``snapshot(app)`` returning a ``DbSnapshot``.
+    """
+
+    module: str
+    factory: str = "create_app"
+    snapshot: str = "snapshot"
+
+
+@dataclass(frozen=True)
 class Environment:
     name: str
     graph: StateGraph
@@ -37,6 +50,7 @@ class Environment:
     build_app: Callable[[frozenset[str]], Any]
     snapshot: Callable[[Any], DbSnapshot]
     baseline_candidates: Callable[[], tuple[CandidateFinding, ...]] = field(default=lambda: ())
+    app_source: AppSource | None = None
 
     def __post_init__(self) -> None:
         ids = [b.id for b in self.bugs]

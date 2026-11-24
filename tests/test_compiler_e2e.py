@@ -113,7 +113,8 @@ def test_synthesized_invariants_hold_on_patched_build(compiled):
 def test_compile_latency_and_compression_metrics(compiled):
     r = compiled.report
     assert r.timings_s["total"] < 2.0  # generous CI budget; typical ~30-80 ms
-    assert set(r.timings_s) == {"dynamic", "static", "merge_and_synthesis", "total"}
+    assert set(r.timings_s) == {"dynamic", "static", "merge_and_synthesis", "grounding", "total"}
+    assert r.grounded_records == 3  # one wallet per funded or unfunded user persona
     assert r.graph_bytes == len(compiled.graph.to_json(indent=None).encode())
     assert r.source_bytes == len((ROOT / "src/cubic/gym/fintech/app.py").read_bytes())
     assert r.structural_graph_bytes < r.source_bytes  # structure compresses source

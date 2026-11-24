@@ -22,6 +22,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from cubic.compiler.dynamic import DynamicObservation, DynamicRoute, aintrospect, canonicalize
+from cubic.compiler.grounding import aground_personas
 from cubic.compiler.invariants import synthesize_invariants
 from cubic.compiler.static import (
     StaticAnalysis,
@@ -50,6 +51,7 @@ class CompileReport(BaseModel):
     edges: int
     invariants: int
     invariants_by_category: dict[str, int]
+    grounded_records: int = 0
     source_bytes: int
     openapi_bytes: int
     graph_bytes: int
@@ -177,6 +179,7 @@ async def acompile_app(
     personas: Iterable[ActorPersona] = (),
     synthesize: bool = True,
     probe: bool = True,
+    ground: bool = True,
 ) -> CompileResult:
     t0 = time.perf_counter()
     dynamic = await aintrospect(app_factory, probe=probe)
@@ -189,6 +192,11 @@ async def acompile_app(
     t2 = time.perf_counter()
     graph, pairs = build_graph(dynamic, static, app_name=app_name, personas=personas, synthesize=synthesize)
     t3 = time.perf_counter()
+    if ground and graph.actors:
+        graph = graph.model_copy(update={"actors": await aground_personas(app_factory, graph)})
+        graph = StateGraph.model_validate(graph.model_dump())
+    t4 = time.perf_counter()
+    grounded = sum(len(rows) for a in graph.actors for rows in a.observed_state.values())
 
     matched = {id(s) for _, s in pairs if s is not None}
     structural = graph.model_copy(update={"invariants": ()})
@@ -212,13 +220,15 @@ async def acompile_app(
         edges=len(graph.edges),
         invariants=len(graph.invariants),
         invariants_by_category=dict(sorted(by_category.items())),
+        grounded_records=grounded,
         source_bytes=static.source_bytes,
         openapi_bytes=dynamic.openapi_bytes,
         graph_bytes=graph_bytes,
         structural_graph_bytes=len(structural.to_json(indent=None).encode()),
         compression_ratio=static.source_bytes / graph_bytes if graph_bytes else 0.0,
         timings_s={
-            "dynamic": t1 - t0, "static": t2 - t1, "merge_and_synthesis": t3 - t2, "total": t3 - t0,
+            "dynamic": t1 - t0, "static": t2 - t1, "merge_and_synthesis": t3 - t2,
+            "grounding": t4 - t3, "total": t4 - t0,
         },
     )
     return CompileResult(graph=graph, report=report, static=static, dynamic=dynamic)
