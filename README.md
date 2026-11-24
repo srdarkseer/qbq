@@ -61,6 +61,29 @@ uv run qbq remediate --app myservice.main:create_app --personas personas.json \
   resources each persona owns. A compiled `StateGraph` JSON works too.
 - The optional snapshot hook returns a `DbSnapshot` and enables ledger and state-guard
   invariants. Without it, QbQ checks HTTP-level invariants only.
+- Multi-file projects work as-is. The compiler follows `include_router` prefixes, `Depends`
+  chains in `deps.py`/`auth.py` (including `require_role(...)` factories and router-level
+  dependencies) and Pydantic v2 models in `schemas.py`.
+  [`examples/storefront`](examples/storefront) is a worked example.
+
+### Optional live model
+
+The deterministic rule patcher only fixes known defect shapes. For anything else, such as a
+deleted or forgotten guard, pass a model that *proposes* patches and test rankings. Every
+proposal still has to pass the 3-of-3 fix gate.
+
+```bash
+export GEMINI_API_KEY=...            # read from the environment only; never logged or exported
+uv run qbq remediate --app myservice.main:create_app --personas personas.json \
+    --llm-provider gemini [--llm-model gemini-2.5-flash]
+# any OpenAI-compatible server (OpenAI, vLLM, Ollama, LM Studio):
+OPENAI_BASE_URL=http://localhost:11434/v1 uv run qbq search --env saas-compiled \
+    --llm-provider openai --llm-model qwen2.5-coder
+```
+
+`--llm-provider none` (the default) keeps QbQ fully offline. API keys and persona credentials
+are scrubbed from every outgoing prompt, and never appear in graphs, reports, patches or
+datasets.
 
 Only run QbQ against applications you own or are authorized to test.
 
@@ -87,6 +110,7 @@ flowchart LR
 | Search | `qbq.search` | Five typed combinators: cross-persona replay, parallel contention, lifecycle skip, boundary perturbation, cross-tenant reference. Guard- and state-aware `HeuristicGraphPolicy`, pluggable `LLMGuidedPolicy`, best-first beam search with coverage reasons. |
 | Verifier | `qbq.verifier` | Barrier-synchronized replay over in-process ASGI, DB snapshots and row diffs, deterministic checks, 3-of-3 gating, `curl` reproductions. |
 | Remediation | `qbq.remediate` | AST rule patcher plus `LLMPatcher`. The fix gate requires 0/3 exploit runs and no functional regression. Also a standalone pytest exporter and the `qbq remediate` pipeline. |
+| LLM | `qbq.llm` | Zero-dependency `httpx` providers for Gemini (OpenAI-compatible endpoint, JSON mode) and any OpenAI-compatible server: retries, usage accounting, secret scrubbing. Adapters plug them into `LLMGuidedPolicy` and `LLMPatcher`. |
 | RLVR | `qbq.rlvr` | Trajectory recorder, programmatic rewards (+1 / 0 / −1), TRL-compatible `VerifierReward`, leakage-checked JSONL export. |
 | Bug Gym | `qbq.gym` | Three in-process FastAPI testbeds with togglable defects: `fintech`, `saas`, `agent_gateway`. |
 | Eval | `qbq.eval` | Recall@1 / FPR over every build, autonomous environments. |
@@ -114,19 +138,20 @@ The testbeds are intentionally vulnerable. They run only in-process.
 | Command | Purpose |
 | :--- | :--- |
 | `qbq compile` | App → State Graph JSON (`--app`, `--personas`, `--report`, `--no-ground`, `--no-probe`, `--no-invariants`) |
-| `qbq search` | Prioritized test plan and per-invariant coverage (`--env` or `--graph`, `--per-invariant`, `--max-tests`) |
+| `qbq search` | Prioritized test plan and per-invariant coverage (`--env` or `--graph`, `--per-invariant`, `--max-tests`, `--llm-provider`) |
 | `qbq eval` | Recall@1 / FPR across all builds, with CI gates (`--min-recall`, `--max-fpr`) |
-| `qbq remediate` | Verify → patch → gate → export (`--env` or `--app`, `--variant`, `--patch-dir`, `--require-verified`) |
+| `qbq remediate` | Verify → patch → gate → export (`--env` or `--app`, `--variant`, `--patch-dir`, `--require-verified`, `--llm-provider`, `--llm-model`, `--api-key-env`) |
 | `qbq export-rlvr` | Trajectory JSONL + stats (`--train`, `--eval`, `--sample-out`, `--stats`) |
 | `qbq graph` / `qbq schema` | Dump an environment's graph / the State Graph JSON Schema |
 
 ## Repository layout
 
 ```
-src/qbq/        graph · compiler · search · verifier · remediate · rlvr · gym · eval · cli
+src/qbq/        graph · compiler · search · verifier · remediate · llm · rlvr · gym · eval · cli
 tests/            pytest suite (unit, end-to-end, CLI, snapshot consistency)
 benchmarks/       benchmark scripts, results/*.json snapshots, SUMMARY.md (generated)
 datasets/         qbq_rlvr_sample.jsonl (stratified sample; full export is gitignored)
+examples/         storefront: a multi-file FastAPI reference project with an unscripted IDOR
 docs/             ARCHITECTURE.md
 ```
 

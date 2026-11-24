@@ -1,0 +1,8 @@
+[
+  {"id": "anonymous", "display_name": "Anonymous", "role": "ANONYMOUS"},
+  {"id": "ann", "display_name": "Ann (customer)", "role": "CUSTOMER", "auth_token": "tok_ann",
+   "owned_resources": {"orders": ["o_ann"]}},
+  {"id": "ben", "display_name": "Ben (customer)", "role": "CUSTOMER", "auth_token": "tok_ben",
+   "owned_resources": {"orders": ["o_ben"]}},
+  {"id": "ops", "display_name": "Ops admin", "role": "ADMIN", "auth_token": "tok_ops"}
+]

@@ -50,8 +50,9 @@ Referential integrity is validated on construction.
 
 | Pass | Output |
 | :--- | :--- |
-| `static.py` | Python `ast` walk of the endpoint modules: routes, methods, path/body params, auth dependencies, role / ownership / lifecycle guards (followed into same-file helpers), data preconditions (`field != "CONST"` guards), state writes, mutated fields, ledger shape, lock use, Pydantic models, feature-flag conjuncts. |
-| `dynamic.py` | Runs the ASGI lifespan, fetches OpenAPI 3.x with every `$ref` inlined, binds live routes to endpoint functions, and sends one unauthenticated probe per route. |
+| `sources.py` | Picks the files to read: the endpoint modules, the app module, and their local import closure (`deps.py`, `schemas.py`...). Scope is the app's own package, walking up past layout folders such as `routers/` and `api/v1/`; the standard library and third-party code are never read. |
+| `static.py` | Python `ast` walk over the whole project, with a cross-module symbol table: routes and methods, with `APIRouter(prefix=, dependencies=)` and `include_router(prefix=, dependencies=)` resolved (nested mounts and constant prefixes too). Dependencies resolve across modules: imported `Annotated[..., Depends()]` aliases, transitive chains, `require_role(...)` factories, and decorator and router-level `dependencies=[...]`. Guards found inside dependencies count for the route: ownership (also in `or`-guards), roles, lifecycle states, data preconditions. Also: state writes, mutated fields, ledger shape, lock use, Pydantic v1/v2 models across files (with inheritance), feature-flag conjuncts. |
+| `dynamic.py` | Runs the ASGI lifespan, fetches OpenAPI 3.x with every `$ref` inlined, binds live routes to endpoint functions, and sends one unauthenticated probe per route. Included routers are flattened, both old-style copied routes and FastAPI ≥ 0.16x `_IncludedRouter` mounts. |
 | `merge.py` | Joins the passes on (file, decorator line), falling back to (method, path). Runtime is authoritative for paths and schemas. Source supplies guards and provenance. |
 | `grounding.py` | Each authenticated persona sends a `GET` to every read route whose path parameters bind to its own resources. Scalar response fields become `observed_state`, with credential-like field names dropped. |
 | `invariants.py` | Rule-based synthesis (below). |
@@ -133,8 +134,8 @@ invariant, repeating `runs` times. Concurrent steps release every request from a
 | Component | Behaviour |
 | :--- | :--- |
 | `RulePatcher` | `schema_lower_bound`: add `Field(gt=0)` (and the import) to the body field a lower-bound invariant names. `bypassed_guard`: remove a feature-flag or configuration conjunct (or wrapper) that switches off a guard raising a status the invariant expects. `locked_branch`: keep the lock-protected branch of a flag-selected read-modify-write. |
-| `LLMPatcher` | Sends a line-numbered AST slice (handler, same-file helpers, request models) plus the invariant and the trace, without credentials, to any `PatchModel`, then applies the unified diff it returns. |
-| Fix gate (`verify_fix.py`) | Imports the patched source from an isolated temp copy as a uniquely named module, rebuilds the app with the same build toggles, and requires **0/N exploit violations** and **no regression** of any functional QA test that passed before. Outcomes: `verified`, `exploit_reproduces`, `functional_regression`, `patch_invalid`. |
+| `LLMPatcher` | Sends a line-numbered AST slice (handler, same-file helpers, request models) plus the invariant and the trace, without credentials, to any `PatchModel`, then applies the unified diff it returns. For multi-module apps the prompt also carries the file's imports and the definitions of the in-app dependencies it imports, so the model can reuse `OwnedOrder` rather than reimplement it. |
+| Fix gate (`verify_fix.py`) | Imports the patched source from an isolated temp copy, rebuilds the app with the same build toggles, and requires **0/N exploit violations** and **no regression** of any functional QA test that passed before. Outcomes: `verified`, `exploit_reproduces`, `functional_regression`, `patch_invalid`. A patch to the app module loads as a uniquely named module. A patch to another module of the app (a router, while the factory is in `main.py`) copies the whole package and swaps it into `sys.modules` for the duration of the check only. |
 | Exporter | `test_regression_<invariant>.py` depends only on pytest, httpx and the app module. It replays the trace (with barriers), asserts the invariant inline, and runs 3 times. |
 | Pipeline | `qbq remediate`: compile → search → verify → patch + gate → export. It also checks each exported test: it must fail on the unpatched build and pass on the patched code. |
 
@@ -145,7 +146,24 @@ suite shows a deleted ownership check fixed by a model-proposed diff and accepte
 same gate. Patches are diffs against package-relative paths; apply them with
 `git apply --directory=src`.
 
-## 6. RLVR data engine (`qbq.rlvr`)
+## 6. Live models (`qbq.llm`)
+
+`GeminiProvider` (Google's OpenAI-compatible endpoint, default `gemini-2.5-flash`) and
+`OpenAICompatibleProvider` (OpenAI, vLLM, Ollama, LM Studio...) are about 200 lines over
+`httpx`:
+- `temperature=0`, and `response_format={"type": "json_object"}` for rankings;
+- bounded exponential-backoff retries on 429, 5xx and transport errors;
+- token and usage accounting.
+
+Keys are read from the environment variable named by `--api-key-env` only. They live in
+the request header and nowhere else: `repr` hides them, and they are scrubbed from error
+messages even if the server echoes them. `ProviderRankingModel` and `ProviderPatchModel`
+also scrub every persona credential and the key from outgoing messages, and keep the
+scrubbed transcript for audit. Offline tests drive every code path through
+`httpx.MockTransport`. `pytest --live`, with a key, runs a real-model smoke test on
+`examples/storefront`.
+
+## 7. RLVR data engine (`qbq.rlvr`)
 
 | Outcome | Reward | Rule |
 | :--- | ---: | :--- |
@@ -175,7 +193,7 @@ there is none. There `VerifierReward` still separates malformed, flaky and holdi
 proposals, but `true_violation` versus `false_positive` needs a reference build or a
 human-labelled baseline.
 
-## 7. Extending QbQ
+## 8. Extending QbQ
 
 - **New app:** write a factory returning a fresh, seeded app, plus a personas JSON. Add a
   `snapshot(app) -> DbSnapshot` hook if it has a ledger or entity state. Use

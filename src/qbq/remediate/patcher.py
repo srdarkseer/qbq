@@ -62,6 +62,7 @@ class SourceContext:
     handler: FunctionNode
     helpers: tuple[FunctionNode, ...]
     body_models: tuple[ast.ClassDef, ...]
+    imported: tuple[str, ...] = ()  # definitions of names imported from the app's own modules
 
     @property
     def functions(self) -> tuple[FunctionNode, ...]:
@@ -83,12 +84,62 @@ def resolve_module_path(app_source: AppSource) -> Path:
     return Path(spec.origin).resolve()
 
 
+def _display_module(display: str) -> str:
+    return display.removesuffix(".py").replace("/", ".").removesuffix(".__init__")
+
+
+def resolve_source_file(display: str, app_source: AppSource) -> Path:
+    """Path of a provenance file (``pkg/routers/orders.py``) that belongs to the app.
+
+    The file must be the app module itself, or a module under the app's top-level
+    package. QbQ never patches code outside the application it was pointed at.
+    """
+    app_path = resolve_module_path(app_source)
+    if app_path.as_posix().endswith(display):
+        return app_path
+    module = _display_module(display)
+    if module.split(".")[0] != app_source.module.split(".")[0] or "." not in app_source.module:
+        raise PatchError(f"{display} is not part of the application package {app_source.module.split('.')[0]!r}")
+    spec = importlib.util.find_spec(module)
+    if spec is None or not spec.origin or not Path(spec.origin).as_posix().endswith(display):
+        raise PatchError(f"cannot locate {display} for module {module!r}")
+    return Path(spec.origin).resolve()
+
+
+def _imported_definitions(tree: ast.Module, display: str, app_source: AppSource) -> tuple[str, ...]:
+    """Source of the names this file imports from other modules of the same application."""
+    from qbq.compiler.sources import scope_root
+
+    package = _display_module(display).rpartition(".")[0]
+    roots = {scope_root(_display_module(display)), scope_root(app_source.module)} - {""}
+    out: list[str] = []
+    for node in tree.body:
+        if not isinstance(node, ast.ImportFrom):
+            continue
+        base = node.module or ""
+        if node.level:
+            parts = package.split(".") if package else []
+            parts = parts[: len(parts) - (node.level - 1)] if node.level > 1 else parts
+            base = ".".join([*parts, *([node.module] if node.module else [])])
+        if not any(base == r or base.startswith(r + ".") for r in roots):
+            continue
+        spec = importlib.util.find_spec(base)
+        if spec is None or not spec.origin or not spec.origin.endswith(".py"):
+            continue
+        text = Path(spec.origin).read_text(encoding="utf-8")
+        wanted = {a.name for a in node.names}
+        for stmt in ast.parse(text).body:
+            names = ({stmt.name} if isinstance(stmt, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef)
+                     else {t.id for t in getattr(stmt, "targets", []) if isinstance(t, ast.Name)})
+            if names & wanted:
+                out.append(f"# {base.replace('.', '/')}.py:{stmt.lineno}\n{ast.get_source_segment(text, stmt)}")
+    return tuple(out)
+
+
 def load_context(finding: ConfirmedFinding, app_source: AppSource) -> SourceContext:
     if finding.source is None:
         raise PatchError(f"{finding.id}: no source provenance on {finding.edge_id}")
-    path = resolve_module_path(app_source)
-    if not path.as_posix().endswith(finding.source.file):
-        raise PatchError(f"{finding.source.file} is not provided by module {app_source.module}")
+    path = resolve_source_file(finding.source.file, app_source)
     text = path.read_text(encoding="utf-8")
     tree = ast.parse(text, filename=str(path))
     functions = [n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef | ast.AsyncFunctionDef)]
@@ -118,7 +169,8 @@ def load_context(finding: ConfirmedFinding, app_source: AppSource) -> SourceCont
         classes[a.annotation.id] for a in handler.args.args
         if isinstance(a.annotation, ast.Name) and a.annotation.id in classes
     )
-    return SourceContext(finding.source.file, path, text, tree, handler, tuple(helpers), models)
+    return SourceContext(finding.source.file, path, text, tree, handler, tuple(helpers), models,
+                         _imported_definitions(tree, finding.source.file, app_source))
 
 
 # --------------------------------------------------------------------------- text edits
@@ -438,10 +490,13 @@ class PatchPrompt(BaseModel):
     finding: dict
     file: str
     ast_slice: str
+    imported_definitions: str = ""
 
     def render(self) -> str:
-        return json.dumps({"finding": self.finding, "file": self.file, "ast_slice": self.ast_slice},
-                          sort_keys=True, indent=None, separators=(",", ":"))
+        payload = {"finding": self.finding, "file": self.file, "ast_slice": self.ast_slice}
+        if self.imported_definitions:
+            payload["imported_definitions"] = self.imported_definitions
+        return json.dumps(payload, sort_keys=True, indent=None, separators=(",", ":"))
 
     def messages(self) -> list[dict[str, str]]:
         return [{"role": "system", "content": self.system}, {"role": "user", "content": self.render()}]
@@ -455,13 +510,17 @@ class PatchModel(Protocol):
 PATCH_SYSTEM_PROMPT = (
     "You fix a verified security or business-logic defect in a Python web service. You get the "
     "violated invariant, the replayed trace, and line-numbered source for the handler, its "
-    "helpers and its request models. Reply with a minimal unified diff against the given file "
+    "helpers and its request models (plus, for multi-module apps, the file's imports and the "
+    "definitions of dependencies it imports, which you should reuse rather than reimplement). "
+    "Reply with a minimal unified diff against the given file "
     "(--- a/<file> / +++ b/<file>), in a ```diff block. Do not change unrelated behaviour."
 )
 
 
 def build_patch_prompt(finding: ConfirmedFinding, ctx: SourceContext) -> PatchPrompt:
-    parts = [ctx.numbered(n) for n in (*ctx.body_models, *ctx.helpers, ctx.handler)]
+    imports = [n for n in ctx.tree.body if isinstance(n, ast.Import | ast.ImportFrom)]
+    parts = [ctx.numbered(n) for n in (*imports, *ctx.body_models, *ctx.helpers, ctx.handler)] if ctx.imported \
+        else [ctx.numbered(n) for n in (*ctx.body_models, *ctx.helpers, ctx.handler)]
     return PatchPrompt(
         system=PATCH_SYSTEM_PROMPT,
         finding={
@@ -474,6 +533,7 @@ def build_patch_prompt(finding: ConfirmedFinding, ctx: SourceContext) -> PatchPr
         },
         file=ctx.display,
         ast_slice="\n\n".join(parts),
+        imported_definitions="\n\n".join(ctx.imported),
     )
 
 

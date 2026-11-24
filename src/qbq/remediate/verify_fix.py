@@ -23,9 +23,12 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import hashlib
+import importlib
 import importlib.util
+import shutil
 import sys
 import tempfile
+import threading
 import time
 from collections.abc import Callable, Iterator, Sequence
 from pathlib import Path
@@ -41,7 +44,7 @@ from qbq.remediate.models import (
     FunctionalCheck,
     PatchCandidate,
 )
-from qbq.remediate.patcher import resolve_module_path
+from qbq.remediate.patcher import resolve_module_path, resolve_source_file
 from qbq.verifier.replay import DeterministicVerifier, Verdict
 from qbq.verifier.snapshot import DbSnapshot
 from qbq.verifier.trace import CandidateFinding
@@ -52,8 +55,20 @@ Snapshotter = Callable[[Any], DbSnapshot]
 
 @contextlib.contextmanager
 def patched_module(patch: PatchCandidate, app_source: AppSource) -> Iterator[ModuleType]:
-    """Import ``patch.patched_source`` from a throwaway copy of the target module."""
+    """Yield the app module with ``patch`` applied, imported from a throwaway copy.
+
+    If the patch targets the app module itself, only that file is copied and loaded
+    under a unique name. If it targets another module of the application (e.g.
+    ``shop/routers/orders.py`` while the factory lives in ``shop/main.py``), the whole
+    top-level package is copied with the patch applied. Then, for the duration of the
+    context only, that copy replaces the package in ``sys.modules``. The originals are
+    restored afterwards, and no file outside the temp directory is touched.
+    """
     original = resolve_module_path(app_source)
+    if not original.as_posix().endswith(patch.file):
+        with _package_overlay(patch, app_source) as module:
+            yield module
+        return
     digest = hashlib.sha256(patch.patched_source.encode()).hexdigest()[:12]
     name = f"qbq_patched_{digest}_{abs(hash(patch.finding_id)) % 10**8}"
     with tempfile.TemporaryDirectory(prefix="qbq-fix-") as tmp:
@@ -69,6 +84,38 @@ def patched_module(patch: PatchCandidate, app_source: AppSource) -> Iterator[Mod
             yield module
         finally:
             sys.modules.pop(name, None)
+
+
+_OVERLAY_LOCK = threading.RLock()
+
+
+@contextlib.contextmanager
+def _package_overlay(patch: PatchCandidate, app_source: AppSource) -> Iterator[ModuleType]:
+    resolve_source_file(patch.file, app_source)  # refuses files outside the application package
+    top = app_source.module.split(".")[0]
+    if top == "qbq":
+        raise ImportError("refusing to overlay the qbq package itself")
+    spec = importlib.util.find_spec(top)
+    if spec is None or not spec.submodule_search_locations:
+        raise ImportError(f"{top!r} is not a package")
+    package_dir = Path(next(iter(spec.submodule_search_locations)))
+    with _OVERLAY_LOCK, tempfile.TemporaryDirectory(prefix="qbq-fix-") as tmp:
+        shutil.copytree(package_dir, Path(tmp) / top, ignore=shutil.ignore_patterns("__pycache__"))
+        (Path(tmp) / patch.file).write_text(patch.patched_source, encoding="utf-8")
+        owned = lambda name: name == top or name.startswith(top + ".")  # noqa: E731
+        saved = {k: v for k, v in sys.modules.items() if owned(k)}
+        for name in saved:
+            del sys.modules[name]
+        sys.path.insert(0, tmp)
+        importlib.invalidate_caches()
+        try:
+            yield importlib.import_module(app_source.module)
+        finally:
+            for name in [k for k in sys.modules if owned(k)]:
+                del sys.modules[name]
+            sys.modules.update(saved)
+            sys.path.remove(tmp)
+            importlib.invalidate_caches()
 
 
 async def _verdicts(

@@ -9,6 +9,7 @@ generated from the snapshots in `results/` by `summarize.py`.
 | `ablation_search.py` | `results/search_ablation.json` | Fintech: (1) unfiltered proposals vs verifier-gated findings, for the guided plan and for the unpruned combinator pool; (2) uniform random edge sampling vs graph-guided search (Recall@1 at equal budget, tests needed to reach full recall) |
 | `remediation_bench.py` | `results/remediation_bench.json` | All three gyms: Recall@1 / FPR with and without persona grounding, patch pass rate, first-attempt pass rate, rules used, regression-test validity, per-stage wall clock of `qbq remediate` |
 | `qbq export-rlvr --stats` | `results/rlvr_stats.json` | RLVR dataset: rows, prompts, reward histograms per split, leakage check, dataset SHA-256 |
+| `live_llm_smoke.py` | none (live output is not deterministic) | A real model (`--provider gemini\|openai`) fixes the multi-file storefront IDOR; prints gate verdicts and token usage |
 | `summarize.py` | `SUMMARY.md` | Renders every table above; `--check` fails if SUMMARY.md is stale |
 
 ```bash
