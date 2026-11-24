@@ -14,7 +14,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from cubic.graph.ids import Identifier, StrSet
+from cubic.graph.ids import Identifier, IntSet, StrSet
 from cubic.graph.invariants import InvariantAssertion
 
 SCHEMA_VERSION = "1"
@@ -79,6 +79,20 @@ class TransitionEdge(_Frozen):
         default=None, description="JSON Schema of the request body, if any."
     )
     latency_ms: float | None = Field(default=None, ge=0)
+    response_statuses: IntSet = Field(
+        default_factory=frozenset, description="HTTP statuses this edge is known to produce."
+    )
+    metadata: dict[str, Any] = Field(
+        default_factory=dict, description="Provenance (source file/line) and extracted guard facts."
+    )
+
+    @field_validator("response_statuses")
+    @classmethod
+    def _valid_statuses(cls, value: frozenset[int]) -> frozenset[int]:
+        bad = sorted(code for code in value if not 100 <= code <= 599)
+        if bad:
+            raise ValueError(f"invalid HTTP status codes: {bad}")
+        return value
 
     @field_validator("path")
     @classmethod
