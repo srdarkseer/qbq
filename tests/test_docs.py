@@ -5,7 +5,7 @@ import re
 import tomllib
 from pathlib import Path
 
-from cubic.cli import build_parser
+from qbq.cli import build_parser
 
 ROOT = Path(__file__).resolve().parents[1]
 DOCS = [ROOT / "README.md", ROOT / "docs/ARCHITECTURE.md", ROOT / "benchmarks/README.md",
@@ -27,7 +27,7 @@ def test_readme_documents_every_cli_command():
     readme = (ROOT / "README.md").read_text()
     commands = next(a for a in build_parser()._actions if a.dest == "command").choices
     for command in commands:
-        assert f"cubic {command}" in readme, command
+        assert f"qbq {command}" in readme, command
 
 
 def test_relative_links_resolve():

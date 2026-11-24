@@ -1,5 +1,5 @@
 {
-  "dataset": "cubic-rlvr",
+  "dataset": "qbq-rlvr",
   "format": "jsonl; TRL conversational prompt/completion + reward",
   "reward_scheme": {
     "true_violation": 1.0,
@@ -12,7 +12,7 @@
   },
   "runs_per_verification": 3,
   "rows": 2155,
-  "sha256": "aa1cd0e06377cab8ee3382c5b6913ec6ca9093db153947ad6c26a970916ea976",
+  "sha256": "ef1d14b99d87ed41da25c2da26a727625834e009e8fd7cf6e8dacc36712b92b8",
   "leakage": {
     "shared_prompts": 0,
     "shared_envs": [],
@@ -106,9 +106,9 @@
     }
   },
   "sample": {
-    "path": "datasets/cubic_rlvr_sample.jsonl",
+    "path": "datasets/qbq_rlvr_sample.jsonl",
     "rows": 24,
     "per_stratum": 2,
-    "sha256": "179d3ea9dfd19bb56968dfbd70865464f12b064bd47d03791d8858396c7cc44b"
+    "sha256": "96624fb73569632b8da4248084dfb4e0f1f03d5fb13949ceb6570ce235714138"
   }
 }

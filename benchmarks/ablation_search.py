@@ -32,12 +32,12 @@ from collections import Counter
 from collections.abc import Sequence
 from pathlib import Path
 
-from cubic import __version__
-from cubic.eval import CaseResult, compute_metrics
-from cubic.gym import load_environment
-from cubic.gym.base import Environment, Variant
-from cubic.search import ProposedTest, generate_pool, search, uniform_edge_sample
-from cubic.verifier import DeterministicVerifier, Verdict
+from qbq import __version__
+from qbq.eval import CaseResult, compute_metrics
+from qbq.gym import load_environment
+from qbq.gym.base import Environment, Variant
+from qbq.search import ProposedTest, generate_pool, search, uniform_edge_sample
+from qbq.verifier import DeterministicVerifier, Verdict
 
 Verdicts = dict[tuple[str, str], Verdict]  # (variant, test id) -> verdict
 
@@ -173,7 +173,7 @@ def run(runs: int = 3, seeds: int = 200, variant_names: Sequence[str] | None = N
 
     return {
         "benchmark": "search_ablation",
-        "cubic_version": __version__,
+        "qbq_version": __version__,
         "environment": env.name,
         "variants": [v.name for v in variants],
         "runs_per_candidate": runs,

@@ -1,7 +1,7 @@
 import textwrap
 
-from cubic.compiler import analyze_files, analyze_sources, extract_candidates
-from cubic.graph import HttpMethod, StateGraph
+from qbq.compiler import analyze_files, analyze_sources, extract_candidates
+from qbq.graph import HttpMethod, StateGraph
 
 ROUTER_SRC = textwrap.dedent('''
     from typing import Annotated
@@ -136,8 +136,8 @@ def test_candidates_form_a_valid_graph_with_unique_ids():
 
 
 def test_fintech_testbed_static_facts():
-    a = analyze_files(["src/cubic/gym/fintech/app.py"], root="src")
-    assert a.files == ("cubic/gym/fintech/app.py",)
+    a = analyze_files(["src/qbq/gym/fintech/app.py"], root="src")
+    assert a.files == ("qbq/gym/fintech/app.py",)
     assert len(a.routes) == 7 and a.roles == {"USER", "ADMIN"}
     assert a.entity_collections == {"users", "wallets", "loans"}
     assert a.ledger is not None
@@ -157,6 +157,6 @@ def test_fintech_testbed_static_facts():
 
 
 def test_static_analysis_is_deterministic():
-    one = extract_candidates(analyze_files(["src/cubic/gym/fintech/app.py"], root="src"))
-    two = extract_candidates(analyze_files(["src/cubic/gym/fintech/app.py"], root="src"))
+    one = extract_candidates(analyze_files(["src/qbq/gym/fintech/app.py"], root="src"))
+    two = extract_candidates(analyze_files(["src/qbq/gym/fintech/app.py"], root="src"))
     assert one == two

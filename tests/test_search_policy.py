@@ -2,9 +2,9 @@ import json
 
 import pytest
 
-from cubic.gym.fintech.compiled import compiled_graph
-from cubic.gym.fintech.graph import build_graph
-from cubic.search import (
+from qbq.gym.fintech.compiled import compiled_graph
+from qbq.gym.fintech.graph import build_graph
+from qbq.search import (
     CombinatorKind,
     CoverageStatus,
     GraphSearch,
@@ -22,7 +22,7 @@ from cubic.search import (
     search,
     uniform_edge_sample,
 )
-from cubic.verifier import validate_candidate
+from qbq.verifier import validate_candidate
 
 G = compiled_graph()
 H = HeuristicGraphPolicy()

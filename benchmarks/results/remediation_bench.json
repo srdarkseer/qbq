@@ -1,6 +1,6 @@
 {
   "benchmark": "remediation",
-  "cubic_version": "0.1.0",
+  "qbq_version": "0.1.0",
   "runs_per_candidate": 3,
   "summary": {
     "apps": 3,
@@ -72,7 +72,7 @@
               "inv.tenant.read_wallet": {
                 "oracle": "forbidden",
                 "rule": "rule:bypassed_guard",
-                "source": "cubic/gym/fintech/app.py:155",
+                "source": "qbq/gym/fintech/app.py:155",
                 "exploit_violations_after": 0,
                 "functional_checks": 5,
                 "regressions": [],
@@ -91,7 +91,7 @@
               "inv.ledger.conservation": {
                 "oracle": "conservation",
                 "rule": "rule:locked_branch",
-                "source": "cubic/gym/fintech/app.py:165",
+                "source": "qbq/gym/fintech/app.py:165",
                 "exploit_violations_after": 0,
                 "functional_checks": 5,
                 "regressions": [],
@@ -110,7 +110,7 @@
               "inv.lifecycle.disburse_loan": {
                 "oracle": "rejected_transition",
                 "rule": "rule:bypassed_guard",
-                "source": "cubic/gym/fintech/app.py:240",
+                "source": "qbq/gym/fintech/app.py:240",
                 "exploit_violations_after": 0,
                 "functional_checks": 5,
                 "regressions": [],
@@ -129,7 +129,7 @@
               "inv.input.transfer.amount": {
                 "oracle": "rejected_input",
                 "rule": "rule:schema_lower_bound",
-                "source": "cubic/gym/fintech/app.py:185",
+                "source": "qbq/gym/fintech/app.py:185",
                 "exploit_violations_after": 0,
                 "functional_checks": 5,
                 "regressions": [],
@@ -148,7 +148,7 @@
               "inv.input.transfer.amount": {
                 "oracle": "rejected_input",
                 "rule": "rule:schema_lower_bound",
-                "source": "cubic/gym/fintech/app.py:185",
+                "source": "qbq/gym/fintech/app.py:185",
                 "exploit_violations_after": 0,
                 "functional_checks": 5,
                 "regressions": [],
@@ -157,7 +157,7 @@
               "inv.ledger.conservation": {
                 "oracle": "conservation",
                 "rule": "rule:locked_branch",
-                "source": "cubic/gym/fintech/app.py:165",
+                "source": "qbq/gym/fintech/app.py:165",
                 "exploit_violations_after": 0,
                 "functional_checks": 5,
                 "regressions": [],
@@ -166,7 +166,7 @@
               "inv.lifecycle.disburse_loan": {
                 "oracle": "rejected_transition",
                 "rule": "rule:bypassed_guard",
-                "source": "cubic/gym/fintech/app.py:240",
+                "source": "qbq/gym/fintech/app.py:240",
                 "exploit_violations_after": 0,
                 "functional_checks": 5,
                 "regressions": [],
@@ -175,7 +175,7 @@
               "inv.tenant.read_wallet": {
                 "oracle": "forbidden",
                 "rule": "rule:bypassed_guard",
-                "source": "cubic/gym/fintech/app.py:155",
+                "source": "qbq/gym/fintech/app.py:155",
                 "exploit_violations_after": 0,
                 "functional_checks": 5,
                 "regressions": [],
@@ -239,7 +239,7 @@
               "inv.tenant.read_workspace": {
                 "oracle": "forbidden",
                 "rule": "rule:bypassed_guard",
-                "source": "cubic/gym/saas/app.py:190",
+                "source": "qbq/gym/saas/app.py:190",
                 "exploit_violations_after": 0,
                 "functional_checks": 10,
                 "regressions": [],
@@ -258,7 +258,7 @@
               "inv.ledger.conservation": {
                 "oracle": "conservation",
                 "rule": "rule:locked_branch",
-                "source": "cubic/gym/saas/app.py:200",
+                "source": "qbq/gym/saas/app.py:200",
                 "exploit_violations_after": 0,
                 "functional_checks": 10,
                 "regressions": [],
@@ -277,7 +277,7 @@
               "inv.lifecycle.upgrade_subscription": {
                 "oracle": "rejected_transition",
                 "rule": "rule:bypassed_guard",
-                "source": "cubic/gym/saas/app.py:274",
+                "source": "qbq/gym/saas/app.py:274",
                 "exploit_violations_after": 0,
                 "functional_checks": 10,
                 "regressions": [],
@@ -296,7 +296,7 @@
               "inv.input.buy_seats.quantity": {
                 "oracle": "rejected_input",
                 "rule": "rule:schema_lower_bound",
-                "source": "cubic/gym/saas/app.py:222",
+                "source": "qbq/gym/saas/app.py:222",
                 "exploit_violations_after": 0,
                 "functional_checks": 10,
                 "regressions": [],
@@ -315,7 +315,7 @@
               "inv.input.buy_seats.quantity": {
                 "oracle": "rejected_input",
                 "rule": "rule:schema_lower_bound",
-                "source": "cubic/gym/saas/app.py:222",
+                "source": "qbq/gym/saas/app.py:222",
                 "exploit_violations_after": 0,
                 "functional_checks": 10,
                 "regressions": [],
@@ -324,7 +324,7 @@
               "inv.ledger.conservation": {
                 "oracle": "conservation",
                 "rule": "rule:locked_branch",
-                "source": "cubic/gym/saas/app.py:200",
+                "source": "qbq/gym/saas/app.py:200",
                 "exploit_violations_after": 0,
                 "functional_checks": 10,
                 "regressions": [],
@@ -333,7 +333,7 @@
               "inv.lifecycle.upgrade_subscription": {
                 "oracle": "rejected_transition",
                 "rule": "rule:bypassed_guard",
-                "source": "cubic/gym/saas/app.py:274",
+                "source": "qbq/gym/saas/app.py:274",
                 "exploit_violations_after": 0,
                 "functional_checks": 10,
                 "regressions": [],
@@ -342,7 +342,7 @@
               "inv.tenant.read_workspace": {
                 "oracle": "forbidden",
                 "rule": "rule:bypassed_guard",
-                "source": "cubic/gym/saas/app.py:190",
+                "source": "qbq/gym/saas/app.py:190",
                 "exploit_violations_after": 0,
                 "functional_checks": 10,
                 "regressions": [],
@@ -404,7 +404,7 @@
               "inv.tenant.read_conversation": {
                 "oracle": "forbidden",
                 "rule": "rule:bypassed_guard",
-                "source": "cubic/gym/agent_gateway/app.py:230",
+                "source": "qbq/gym/agent_gateway/app.py:230",
                 "exploit_violations_after": 0,
                 "functional_checks": 10,
                 "regressions": [],
@@ -423,7 +423,7 @@
               "inv.tool_authz.create_tool_call": {
                 "oracle": "forbidden",
                 "rule": "rule:bypassed_guard",
-                "source": "cubic/gym/agent_gateway/app.py:222",
+                "source": "qbq/gym/agent_gateway/app.py:222",
                 "exploit_violations_after": 0,
                 "functional_checks": 10,
                 "regressions": [],
@@ -442,7 +442,7 @@
               "inv.ai_bounds.create_completion.max_tokens": {
                 "oracle": "rejected_input",
                 "rule": "rule:bypassed_guard",
-                "source": "cubic/gym/agent_gateway/app.py:206",
+                "source": "qbq/gym/agent_gateway/app.py:206",
                 "exploit_violations_after": 0,
                 "functional_checks": 10,
                 "regressions": [],
@@ -461,7 +461,7 @@
               "inv.lifecycle.execute_action": {
                 "oracle": "rejected_transition",
                 "rule": "rule:bypassed_guard",
-                "source": "cubic/gym/agent_gateway/app.py:264",
+                "source": "qbq/gym/agent_gateway/app.py:264",
                 "exploit_violations_after": 0,
                 "functional_checks": 10,
                 "regressions": [],
@@ -480,7 +480,7 @@
               "inv.ai_bounds.create_completion.max_tokens": {
                 "oracle": "rejected_input",
                 "rule": "rule:bypassed_guard",
-                "source": "cubic/gym/agent_gateway/app.py:206",
+                "source": "qbq/gym/agent_gateway/app.py:206",
                 "exploit_violations_after": 0,
                 "functional_checks": 10,
                 "regressions": [],
@@ -489,7 +489,7 @@
               "inv.lifecycle.execute_action": {
                 "oracle": "rejected_transition",
                 "rule": "rule:bypassed_guard",
-                "source": "cubic/gym/agent_gateway/app.py:264",
+                "source": "qbq/gym/agent_gateway/app.py:264",
                 "exploit_violations_after": 0,
                 "functional_checks": 10,
                 "regressions": [],
@@ -498,7 +498,7 @@
               "inv.tool_authz.create_tool_call": {
                 "oracle": "forbidden",
                 "rule": "rule:bypassed_guard",
-                "source": "cubic/gym/agent_gateway/app.py:222",
+                "source": "qbq/gym/agent_gateway/app.py:222",
                 "exploit_violations_after": 0,
                 "functional_checks": 10,
                 "regressions": [],
@@ -507,7 +507,7 @@
               "inv.tenant.read_conversation": {
                 "oracle": "forbidden",
                 "rule": "rule:bypassed_guard",
-                "source": "cubic/gym/agent_gateway/app.py:230",
+                "source": "qbq/gym/agent_gateway/app.py:230",
                 "exploit_violations_after": 0,
                 "functional_checks": 10,
                 "regressions": [],
@@ -524,30 +524,30 @@
     "python": "3.11.9",
     "remediate_vulnerable": {
       "fintech": {
-        "compile": 0.0334,
+        "compile": 0.0344,
         "search": 0.0055,
-        "verify": 0.2872,
-        "patch_and_verify": 0.7649,
-        "export": 0.4042,
-        "total": 1.4952
+        "verify": 0.2781,
+        "patch_and_verify": 0.7651,
+        "export": 0.3808,
+        "total": 1.4639
       },
       "saas": {
-        "compile": 0.0575,
-        "search": 0.0034,
-        "verify": 0.4643,
-        "patch_and_verify": 1.1868,
-        "export": 0.3913,
-        "total": 2.1033
+        "compile": 0.0536,
+        "search": 0.0032,
+        "verify": 0.4933,
+        "patch_and_verify": 1.1822,
+        "export": 0.3966,
+        "total": 2.129
       },
       "agent_gateway": {
-        "compile": 0.0803,
+        "compile": 0.0527,
         "search": 0.005,
-        "verify": 0.6766,
-        "patch_and_verify": 0.7425,
-        "export": 0.0803,
-        "total": 1.5847
+        "verify": 0.6831,
+        "patch_and_verify": 0.72,
+        "export": 0.0781,
+        "total": 1.5389
       }
     },
-    "benchmark_total": 36.87
+    "benchmark_total": 37.68
   }
 }

@@ -1,19 +1,19 @@
 import asyncio
 
-from cubic.compiler import compile_app
-from cubic.compiler.grounding import aground_personas
-from cubic.graph import ActorPersona, StateGraph
-from cubic.gym.fintech import create_app
-from cubic.gym.fintech.compiled import compiled_graph
-from cubic.gym.fintech.graph import build_graph
-from cubic.gym.saas.environment import compiled_graph as saas_graph
-from cubic.search.readiness import (
+from qbq.compiler import compile_app
+from qbq.compiler.grounding import aground_personas
+from qbq.graph import ActorPersona, StateGraph
+from qbq.gym.fintech import create_app
+from qbq.gym.fintech.compiled import compiled_graph
+from qbq.gym.fintech.graph import build_graph
+from qbq.gym.saas.environment import compiled_graph as saas_graph
+from qbq.search.readiness import (
     Readiness,
     ledger_readiness,
     observed_state_of,
     precondition_readiness,
 )
-from cubic.verifier import ActionStep
+from qbq.verifier import ActionStep
 
 G = compiled_graph()
 S = saas_graph()

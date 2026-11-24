@@ -3,12 +3,12 @@ import textwrap
 
 import pytest
 
-from cubic.cli import main
-from cubic.compiler import TargetError
-from cubic.compiler.adapter import external_environment, load_personas
-from cubic.graph import ActorPersona
-from cubic.remediate import LLMPatcher, PatchPrompt, RulePatcher, remediate
-from cubic.remediate.patcher import unified_diff
+from qbq.cli import main
+from qbq.compiler import TargetError
+from qbq.compiler.adapter import external_environment, load_personas
+from qbq.graph import ActorPersona
+from qbq.remediate import LLMPatcher, PatchPrompt, RulePatcher, remediate
+from qbq.remediate.patcher import unified_diff
 
 DEMO_APP = textwrap.dedent('''\
     """A third-party shop API: not a Bug Gym app, no feature flags, real-world-style bugs."""

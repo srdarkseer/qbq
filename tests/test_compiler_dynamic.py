@@ -5,10 +5,10 @@ from typing import Annotated
 import pytest
 from fastapi import Depends, FastAPI, Header, HTTPException
 
-from cubic.compiler import TargetError, compile_app, introspect, load_target
-from cubic.compiler.dynamic import canonicalize, resolve_refs
-from cubic.gym.fintech import create_app
-from cubic.gym.fintech.graph import build_graph
+from qbq.compiler import TargetError, compile_app, introspect, load_target
+from qbq.compiler.dynamic import canonicalize, resolve_refs
+from qbq.gym.fintech import create_app
+from qbq.gym.fintech.graph import build_graph
 
 
 # -- a small app exercising lifespan, dynamic-only routes and auth conflicts --------
@@ -84,7 +84,7 @@ def test_dynamic_only_routes_and_auth_conflicts_are_reported():
 def test_fintech_routes_and_bindings():
     obs = introspect(lambda: create_app())
     assert obs.openapi_version.startswith("3.")
-    assert obs.source_files[0][0] == "cubic/gym/fintech/app.py"
+    assert obs.source_files[0][0] == "qbq/gym/fintech/app.py"
     assert len(obs.routes) == 7
     for route in obs.routes:
         expected = 200 if route.path == "/health" else 401
@@ -120,7 +120,7 @@ def test_merge_prefers_runtime_schema_and_keeps_static_provenance():
     graph = compile_app(lambda: create_app()).graph
     withdraw = graph.edge("edge.withdraw")
     assert withdraw.payload_schema["properties"]["amount"]["exclusiveMinimum"] == 0
-    assert withdraw.metadata["source"]["file"] == "cubic/gym/fintech/app.py"
+    assert withdraw.metadata["source"]["file"] == "qbq/gym/fintech/app.py"
     assert withdraw.metadata["evidence"] == ["openapi", "runtime", "static"]
     assert withdraw.metadata["writes_ledger"] and withdraw.metadata["guards"]["ownership"]
     assert {401, 403, 404, 422} <= withdraw.response_statuses
@@ -129,15 +129,15 @@ def test_merge_prefers_runtime_schema_and_keeps_static_provenance():
 
 
 @pytest.mark.parametrize("spec", [
-    "cubic.gym.fintech.app:create_app",
-    "cubic.gym.fintech.app",
-    "src/cubic/gym/fintech/app.py",
-    "src/cubic/gym/fintech/app.py:create_app",
+    "qbq.gym.fintech.app:create_app",
+    "qbq.gym.fintech.app",
+    "src/qbq/gym/fintech/app.py",
+    "src/qbq/gym/fintech/app.py:create_app",
 ])
 def test_load_target_forms(spec):
     factory = load_target(spec)
     a, b = factory(), factory()
-    assert a is not b and a.title == "Cubic Fintech Testbed"
+    assert a is not b and a.title == "QbQ Fintech Testbed"
 
 
 def test_load_target_instance_and_errors(tmp_path):
@@ -150,4 +150,4 @@ def test_load_target_instance_and_errors(tmp_path):
     with pytest.raises(TargetError, match="cannot import"):
         load_target("not_a_real_module_xyz")
     with pytest.raises(TargetError, match="no ASGI app"):
-        load_target("cubic.gym.fintech.app:does_not_exist")
+        load_target("qbq.gym.fintech.app:does_not_exist")

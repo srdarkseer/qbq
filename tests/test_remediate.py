@@ -6,9 +6,9 @@ from pathlib import Path
 
 import pytest
 
-from cubic.gym import load_environment
-from cubic.gym.fintech import app as fintech_app
-from cubic.remediate import (
+from qbq.gym import load_environment
+from qbq.gym.fintech import app as fintech_app
+from qbq.remediate import (
     ConfirmedFinding,
     FixVerdict,
     LLMPatcher,
@@ -25,8 +25,8 @@ from cubic.remediate import (
     propose_patches,
     regression_file_name,
 )
-from cubic.search import Oracle, search
-from cubic.verifier import DeterministicVerifier
+from qbq.search import Oracle, search
+from qbq.verifier import DeterministicVerifier
 
 FINTECH = load_environment("fintech-compiled")
 SAAS = load_environment("saas-compiled")
@@ -76,7 +76,7 @@ def test_confirmed_finding_carries_source_provenance(fintech):
                              "inv.lifecycle.disburse_loan", "inv.input.transfer.amount"}
     race = findings["inv.ledger.conservation"]
     assert race.oracle is Oracle.CONSERVATION and race.edge_id == "edge.withdraw"
-    assert race.source.file == "cubic/gym/fintech/app.py" and race.source.function == "withdraw"
+    assert race.source.file == "qbq/gym/fintech/app.py" and race.source.function == "withdraw"
     assert race.reproduction.startswith("#!/usr/bin/env bash")
 
 
@@ -113,7 +113,7 @@ def test_rule_patcher_picks_rule_by_oracle(fintech):
 def test_rule_patches_are_minimal_unified_diffs(fintech):
     findings, _ = fintech
     schema = propose_patches(findings["inv.input.transfer.amount"], FINTECH.app_source)[0]
-    assert schema.diff.startswith("--- a/cubic/gym/fintech/app.py\n+++ b/cubic/gym/fintech/app.py\n")
+    assert schema.diff.startswith("--- a/qbq/gym/fintech/app.py\n+++ b/qbq/gym/fintech/app.py\n")
     assert "+    amount: int = Field(gt=0)\n" in schema.diff
     (race,) = propose_patches(findings["inv.ledger.conservation"], FINTECH.app_source)
     assert '-        if "race_withdraw" in bugs:' in race.diff and "+        async with store.locks" in race.diff
@@ -249,7 +249,7 @@ def test_exported_tests_pass_when_fixed_and_fail_when_bug_returns(fintech, tmp_p
         path = export_regression_test(finding, FINTECH.graph, FINTECH.app_source, tmp_path)
         assert path.name == regression_file_name(inv_id)
         source = path.read_text()
-        assert "import cubic" not in source.replace("from cubic.gym.fintech.app import", "")
+        assert "import qbq" not in source.replace("from qbq.gym.fintech.app import", "")
         module = _load(path)
         test = getattr(module, path.stem)
         test(0)  # default factory = the fixed (patched) build

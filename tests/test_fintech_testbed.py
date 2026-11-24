@@ -4,9 +4,9 @@ import httpx
 import pytest
 from fastapi.routing import APIRoute
 
-from cubic.graph import StateGraph
-from cubic.gym import load_environment
-from cubic.gym.fintech import BUG_IDS, BUGS, build_graph, create_app
+from qbq.graph import StateGraph
+from qbq.gym import load_environment
+from qbq.gym.fintech import BUG_IDS, BUGS, build_graph, create_app
 
 ALICE = {"Authorization": "Bearer tok_alice"}
 BOB = {"Authorization": "Bearer tok_bob"}
@@ -130,7 +130,7 @@ def test_graph_matches_application_routes():
 
 
 def test_graph_actors_match_seeded_tokens():
-    from cubic.gym.fintech.app import SEED_TOKENS
+    from qbq.gym.fintech.app import SEED_TOKENS
 
     tokens = {a.auth_token for a in build_graph().actors if a.auth_token}
     assert tokens == set(SEED_TOKENS)

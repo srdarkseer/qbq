@@ -16,10 +16,10 @@ import statistics
 import sys
 from pathlib import Path
 
-from cubic import __version__
-from cubic.compiler import compare_graphs, compile_app
-from cubic.gym.fintech import create_app
-from cubic.gym.fintech.graph import build_graph
+from qbq import __version__
+from qbq.compiler import compare_graphs, compile_app
+from qbq.gym.fintech import create_app
+from qbq.gym.fintech.graph import build_graph
 
 
 def _pct(values: list[float], q: float) -> float:
@@ -46,7 +46,7 @@ def run(iterations: int) -> dict:
     fidelity = compare_graphs(build_graph(), first.graph)
     return {
         "benchmark": "compile_fintech",
-        "cubic_version": __version__,
+        "qbq_version": __version__,
         "python": platform.python_version(),
         "platform": f"{platform.system()} {platform.machine()}",
         "iterations": iterations,

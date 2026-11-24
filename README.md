@@ -1,8 +1,8 @@
-# QbQ ("Cubic")
+# QbQ (pronounced "Cubic")
 
 **An agentic QA & security testing engine that never trusts a model to judge a finding.**
 
-Cubic compiles a web application into a typed **Behavioral State Graph**, searches that
+QbQ compiles a web application into a typed **Behavioral State Graph**, searches that
 graph for multi-persona test sequences that could break business, security or functional
 invariants, and confirms every claim by replaying it **3 out of 3 times** on a freshly
 seeded app. Confirmed findings go through a closed loop. A patch is synthesized and kept
@@ -32,26 +32,26 @@ uv sync
 uv run pytest                                  # full test suite
 
 # 1. compile an app (source AST + live OpenAPI/runtime + persona grounding) into a State Graph
-uv run cubic compile --app cubic.gym.saas.app:create_app --out graph.json
+uv run qbq compile --app qbq.gym.saas.app:create_app --out graph.json
 
 # 2. search the graph for a prioritized, multi-persona test plan
-uv run cubic search --env saas-compiled
+uv run qbq search --env saas-compiled
 
 # 3. score the autonomous plan on every build of a Bug Gym app (CI gate)
-uv run cubic eval --env saas-autonomous --min-recall 1.0 --max-fpr 0.0
+uv run qbq eval --env saas-autonomous --min-recall 1.0 --max-fpr 0.0
 
 # 4. closed loop: verify findings -> synthesize + gate patches -> export regression tests
-uv run cubic remediate --env saas --out-dir regression_tests --patch-dir patches --require-verified
+uv run qbq remediate --env saas --out-dir regression_tests --patch-dir patches --require-verified
 
 # 5. export verifiable-reward trajectories for GRPO / RLVR (train: fintech, eval: saas + agent_gateway)
-uv run cubic export-rlvr --out datasets/cubic_rlvr.jsonl --stats rlvr_stats.json
+uv run qbq export-rlvr --out datasets/qbq_rlvr.jsonl --stats rlvr_stats.json
 ```
 
 ### Your own FastAPI app
 
 ```bash
-uv run cubic compile --app myservice.main:create_app --personas personas.json --out graph.json
-uv run cubic remediate --app myservice.main:create_app --personas personas.json \
+uv run qbq compile --app myservice.main:create_app --personas personas.json --out graph.json
+uv run qbq remediate --app myservice.main:create_app --personas personas.json \
     [--snapshot myservice.main:db_snapshot] --out-dir regression_tests
 ```
 
@@ -60,9 +60,9 @@ uv run cubic remediate --app myservice.main:create_app --personas personas.json 
 - `personas.json` lists `ActorPersona` objects: the seeded test credentials and the
   resources each persona owns. A compiled `StateGraph` JSON works too.
 - The optional snapshot hook returns a `DbSnapshot` and enables ledger and state-guard
-  invariants. Without it, Cubic checks HTTP-level invariants only.
+  invariants. Without it, QbQ checks HTTP-level invariants only.
 
-Only run Cubic against applications you own or are authorized to test.
+Only run QbQ against applications you own or are authorized to test.
 
 ## How it works
 
@@ -82,14 +82,14 @@ flowchart LR
 
 | Layer | Package | What it does |
 | :--- | :--- | :--- |
-| Schema | `cubic.graph` | `StateNode`, `TransitionEdge`, `ActorPersona`, `InvariantAssertion`, `StateGraph`. Typed, validated, byte-deterministic JSON. |
-| Compiler | `cubic.compiler` | Static AST pass (routes, auth, role/ownership/lifecycle guards, ledger writes, locks), dynamic pass (OpenAPI, live route binding, unauthenticated probes), persona grounding, and rule-based invariant synthesis with OWASP API 2023 / OWASP LLM 2025 / CWE tags. |
-| Search | `cubic.search` | Five typed combinators: cross-persona replay, parallel contention, lifecycle skip, boundary perturbation, cross-tenant reference. Guard- and state-aware `HeuristicGraphPolicy`, pluggable `LLMGuidedPolicy`, best-first beam search with coverage reasons. |
-| Verifier | `cubic.verifier` | Barrier-synchronized replay over in-process ASGI, DB snapshots and row diffs, deterministic checks, 3-of-3 gating, `curl` reproductions. |
-| Remediation | `cubic.remediate` | AST rule patcher plus `LLMPatcher`. The fix gate requires 0/3 exploit runs and no functional regression. Also a standalone pytest exporter and the `cubic remediate` pipeline. |
-| RLVR | `cubic.rlvr` | Trajectory recorder, programmatic rewards (+1 / 0 / −1), TRL-compatible `VerifierReward`, leakage-checked JSONL export. |
-| Bug Gym | `cubic.gym` | Three in-process FastAPI testbeds with togglable defects: `fintech`, `saas`, `agent_gateway`. |
-| Eval | `cubic.eval` | Recall@1 / FPR over every build, autonomous environments. |
+| Schema | `qbq.graph` | `StateNode`, `TransitionEdge`, `ActorPersona`, `InvariantAssertion`, `StateGraph`. Typed, validated, byte-deterministic JSON. |
+| Compiler | `qbq.compiler` | Static AST pass (routes, auth, role/ownership/lifecycle guards, ledger writes, locks), dynamic pass (OpenAPI, live route binding, unauthenticated probes), persona grounding, and rule-based invariant synthesis with OWASP API 2023 / OWASP LLM 2025 / CWE tags. |
+| Search | `qbq.search` | Five typed combinators: cross-persona replay, parallel contention, lifecycle skip, boundary perturbation, cross-tenant reference. Guard- and state-aware `HeuristicGraphPolicy`, pluggable `LLMGuidedPolicy`, best-first beam search with coverage reasons. |
+| Verifier | `qbq.verifier` | Barrier-synchronized replay over in-process ASGI, DB snapshots and row diffs, deterministic checks, 3-of-3 gating, `curl` reproductions. |
+| Remediation | `qbq.remediate` | AST rule patcher plus `LLMPatcher`. The fix gate requires 0/3 exploit runs and no functional regression. Also a standalone pytest exporter and the `qbq remediate` pipeline. |
+| RLVR | `qbq.rlvr` | Trajectory recorder, programmatic rewards (+1 / 0 / −1), TRL-compatible `VerifierReward`, leakage-checked JSONL export. |
+| Bug Gym | `qbq.gym` | Three in-process FastAPI testbeds with togglable defects: `fintech`, `saas`, `agent_gateway`. |
+| Eval | `qbq.eval` | Recall@1 / FPR over every build, autonomous environments. |
 
 The design, invariant rules, combinators, reward definitions and their limits are covered
 in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). The product roadmap is in
@@ -113,20 +113,20 @@ The testbeds are intentionally vulnerable. They run only in-process.
 
 | Command | Purpose |
 | :--- | :--- |
-| `cubic compile` | App → State Graph JSON (`--app`, `--personas`, `--report`, `--no-ground`, `--no-probe`, `--no-invariants`) |
-| `cubic search` | Prioritized test plan and per-invariant coverage (`--env` or `--graph`, `--per-invariant`, `--max-tests`) |
-| `cubic eval` | Recall@1 / FPR across all builds, with CI gates (`--min-recall`, `--max-fpr`) |
-| `cubic remediate` | Verify → patch → gate → export (`--env` or `--app`, `--variant`, `--patch-dir`, `--require-verified`) |
-| `cubic export-rlvr` | Trajectory JSONL + stats (`--train`, `--eval`, `--sample-out`, `--stats`) |
-| `cubic graph` / `cubic schema` | Dump an environment's graph / the State Graph JSON Schema |
+| `qbq compile` | App → State Graph JSON (`--app`, `--personas`, `--report`, `--no-ground`, `--no-probe`, `--no-invariants`) |
+| `qbq search` | Prioritized test plan and per-invariant coverage (`--env` or `--graph`, `--per-invariant`, `--max-tests`) |
+| `qbq eval` | Recall@1 / FPR across all builds, with CI gates (`--min-recall`, `--max-fpr`) |
+| `qbq remediate` | Verify → patch → gate → export (`--env` or `--app`, `--variant`, `--patch-dir`, `--require-verified`) |
+| `qbq export-rlvr` | Trajectory JSONL + stats (`--train`, `--eval`, `--sample-out`, `--stats`) |
+| `qbq graph` / `qbq schema` | Dump an environment's graph / the State Graph JSON Schema |
 
 ## Repository layout
 
 ```
-src/cubic/        graph · compiler · search · verifier · remediate · rlvr · gym · eval · cli
+src/qbq/        graph · compiler · search · verifier · remediate · rlvr · gym · eval · cli
 tests/            pytest suite (unit, end-to-end, CLI, snapshot consistency)
 benchmarks/       benchmark scripts, results/*.json snapshots, SUMMARY.md (generated)
-datasets/         cubic_rlvr_sample.jsonl (stratified sample; full export is gitignored)
+datasets/         qbq_rlvr_sample.jsonl (stratified sample; full export is gitignored)
 docs/             ARCHITECTURE.md
 ```
 

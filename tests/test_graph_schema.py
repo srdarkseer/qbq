@@ -3,7 +3,7 @@ import json
 import pytest
 from pydantic import ValidationError
 
-from cubic.graph import (
+from qbq.graph import (
     ActorPersona,
     HttpMethod,
     InvariantAssertion,

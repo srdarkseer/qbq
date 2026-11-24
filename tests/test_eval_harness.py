@@ -2,10 +2,10 @@ import json
 
 import pytest
 
-from cubic.cli import main
-from cubic.eval import CaseResult, compute_metrics, format_report, run_eval
-from cubic.gym import load_environment
-from cubic.verifier import Verdict
+from qbq.cli import main
+from qbq.eval import CaseResult, compute_metrics, format_report, run_eval
+from qbq.gym import load_environment
+from qbq.verifier import Verdict
 
 ENV = load_environment("fintech")
 
@@ -90,7 +90,7 @@ def test_cli_eval_gate_failure(capsys):
 
 def test_cli_graph_and_schema(capsys):
     assert main(["graph"]) == 0
-    assert json.loads(capsys.readouterr().out)["app_name"] == "cubic-fintech-testbed"
+    assert json.loads(capsys.readouterr().out)["app_name"] == "qbq-fintech-testbed"
     assert main(["schema"]) == 0
     assert "StateNode" in json.loads(capsys.readouterr().out)["$defs"]
 

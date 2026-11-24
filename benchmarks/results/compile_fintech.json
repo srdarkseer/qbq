@@ -1,6 +1,6 @@
 {
   "benchmark": "compile_fintech",
-  "cubic_version": "0.1.0",
+  "qbq_version": "0.1.0",
   "python": "3.11.9",
   "platform": "Darwin arm64",
   "iterations": 25,
@@ -15,15 +15,15 @@
     "invariants": 23
   },
   "bytes": {
-    "source": 10679,
-    "openapi": 5810,
-    "compiled_graph": 14242,
-    "structural_graph": 7166
+    "source": 10675,
+    "openapi": 5808,
+    "compiled_graph": 14226,
+    "structural_graph": 7150
   },
   "compression": {
-    "source_over_graph": 0.7498244628563404,
-    "source_over_structural_graph": 1.4902316494557633,
-    "source_plus_openapi_over_structural_graph": 2.301004744627407
+    "source_over_graph": 0.7503866160551104,
+    "source_over_structural_graph": 1.493006993006993,
+    "source_plus_openapi_over_structural_graph": 2.3053146853146855
   },
   "fidelity": {
     "structural_fidelity": 1.0,
@@ -32,29 +32,29 @@
   },
   "latency": {
     "dynamic": {
-      "median_ms": 23.695583979133517,
-      "p95_ms": 37.17491601128131,
-      "min_ms": 21.753375011030585
+      "median_ms": 23.579500033520162,
+      "p95_ms": 39.249584020581096,
+      "min_ms": 21.518792025744915
     },
     "static": {
-      "median_ms": 4.58775000879541,
-      "p95_ms": 5.294332979246974,
-      "min_ms": 4.086375003680587
+      "median_ms": 4.694625036790967,
+      "p95_ms": 5.300749966409057,
+      "min_ms": 4.004708956927061
     },
     "merge_and_synthesis": {
-      "median_ms": 0.5269590183161199,
-      "p95_ms": 0.5547080072574317,
-      "min_ms": 0.4248750046826899
+      "median_ms": 0.48879196401685476,
+      "p95_ms": 0.6438749842345715,
+      "min_ms": 0.42095902608707547
     },
     "grounding": {
-      "median_ms": 3.681959002278745,
-      "p95_ms": 4.075834003742784,
-      "min_ms": 3.343665972352028
+      "median_ms": 3.6187079967930913,
+      "p95_ms": 4.189458035398275,
+      "min_ms": 3.3877920359373093
     },
     "total": {
-      "median_ms": 32.58945798734203,
-      "p95_ms": 46.568666002713144,
-      "min_ms": 29.979625018313527
+      "median_ms": 32.62804099358618,
+      "p95_ms": 48.61929203616455,
+      "min_ms": 30.349167005624622
     }
   }
 }

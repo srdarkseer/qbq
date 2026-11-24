@@ -3,13 +3,13 @@ import asyncio
 import httpx
 import pytest
 
-from cubic.eval import autonomous_environment, run_eval
-from cubic.graph import NodeKind
-from cubic.gym import load_environment
-from cubic.gym.saas import BUG_IDS, create_app, snapshot
-from cubic.gym.saas.environment import BUGS, PERSONAS
-from cubic.search import HeuristicGraphPolicy, search
-from cubic.verifier import Verdict
+from qbq.eval import autonomous_environment, run_eval
+from qbq.graph import NodeKind
+from qbq.gym import load_environment
+from qbq.gym.saas import BUG_IDS, create_app, snapshot
+from qbq.gym.saas.environment import BUGS, PERSONAS
+from qbq.search import HeuristicGraphPolicy, search
+from qbq.verifier import Verdict
 
 ALPHA = {"Authorization": "Bearer tok_alpha"}
 BETA = {"Authorization": "Bearer tok_beta"}

@@ -1,6 +1,6 @@
-# Cubic architecture
+# QbQ architecture
 
-This document describes each layer of Cubic: what it guarantees and where it stops.
+This document describes each layer of QbQ: what it guarantees and where it stops.
 Numbers quoted here come from [`benchmarks/SUMMARY.md`](../benchmarks/SUMMARY.md),
 which is generated from the committed result snapshots.
 
@@ -35,7 +35,7 @@ which is generated from the committed result snapshots.
    snapshots and the RLVR dataset are byte-reproducible. Wall-clock latency is the
    only exception, and it is labeled as such.
 
-## 1. Behavioral State Graph (`cubic.graph`)
+## 1. Behavioral State Graph (`qbq.graph`)
 
 `G = (V, E)` holds three kinds of node: API endpoints, UI screens, and entity states
 (`loan.approved`). Edges are HTTP actions annotated with auth, allowed roles, required
@@ -46,7 +46,7 @@ grounding. Invariants are pure data. A check is one of `status_code`,
 `ledger_conservation` or `state_guard`, and each invariant carries taxonomy `tags`.
 Referential integrity is validated on construction.
 
-## 2. Compiler (`cubic.compiler`)
+## 2. Compiler (`qbq.compiler`)
 
 | Pass | Output |
 | :--- | :--- |
@@ -74,7 +74,7 @@ Every rule is phrased so that it *holds* on a correct application. Rules that de
 field names (`MONEY_FIELD`, `AI_LIMIT_FIELD`, `TOOL_FIELD`) are generic naming
 heuristics, not per-app configuration.
 
-## 3. Search (`cubic.search`)
+## 3. Search (`qbq.search`)
 
 **Oracles.** Each invariant is classified from its check structure alone (never its id
 or text) as unauthenticated, forbidden, rejected-input, rejected-transition, success,
@@ -117,7 +117,7 @@ still yields 70 false positives *after* 3-of-3 gating (FPR 9.8%). Those tests re
 deterministically for the wrong reason, for example an admin allowed to read any wallet.
 With the policy the FPR is 0%. The verifier and the policy are complementary.
 
-## 4. Verifier (`cubic.verifier`)
+## 4. Verifier (`qbq.verifier`)
 
 For each candidate, `DeterministicVerifier` builds a fresh app (a freshly seeded store),
 snapshots it, replays the trace over in-process ASGI, snapshots again, and evaluates the
@@ -128,7 +128,7 @@ invariant, repeating `runs` times. Concurrent steps release every request from a
 - `not_reproduced`
 - `invalid`
 
-## 5. Remediation (`cubic.remediate`)
+## 5. Remediation (`qbq.remediate`)
 
 | Component | Behaviour |
 | :--- | :--- |
@@ -136,7 +136,7 @@ invariant, repeating `runs` times. Concurrent steps release every request from a
 | `LLMPatcher` | Sends a line-numbered AST slice (handler, same-file helpers, request models) plus the invariant and the trace, without credentials, to any `PatchModel`, then applies the unified diff it returns. |
 | Fix gate (`verify_fix.py`) | Imports the patched source from an isolated temp copy as a uniquely named module, rebuilds the app with the same build toggles, and requires **0/N exploit violations** and **no regression** of any functional QA test that passed before. Outcomes: `verified`, `exploit_reproduces`, `functional_regression`, `patch_invalid`. |
 | Exporter | `test_regression_<invariant>.py` depends only on pytest, httpx and the app module. It replays the trace (with barriers), asserts the invariant inline, and runs 3 times. |
-| Pipeline | `cubic remediate`: compile → search → verify → patch + gate → export. It also checks each exported test: it must fail on the unpatched build and pass on the patched code. |
+| Pipeline | `qbq remediate`: compile → search → verify → patch + gate → export. It also checks each exported test: it must fail on the unpatched build and pass on the patched code. |
 
 **Limits.** The rule patcher fixes the gym defect *shapes*: an unbounded input field, a
 guard switched off by a flag, and an unlocked read-modify-write next to a locked one. A
@@ -145,7 +145,7 @@ suite shows a deleted ownership check fixed by a model-proposed diff and accepte
 same gate. Patches are diffs against package-relative paths; apply them with
 `git apply --directory=src`.
 
-## 6. RLVR data engine (`cubic.rlvr`)
+## 6. RLVR data engine (`qbq.rlvr`)
 
 | Outcome | Reward | Rule |
 | :--- | ---: | :--- |
@@ -175,14 +175,14 @@ there is none. There `VerifierReward` still separates malformed, flaky and holdi
 proposals, but `true_violation` versus `false_positive` needs a reference build or a
 human-labelled baseline.
 
-## 7. Extending Cubic
+## 7. Extending QbQ
 
 - **New app:** write a factory returning a fresh, seeded app, plus a personas JSON. Add a
   `snapshot(app) -> DbSnapshot` hook if it has a ledger or entity state. Use
-  `cubic compile/remediate --app`.
-- **New gym:** follow `cubic/gym/saas`. Write `create_app(active_bugs)` and
+  `qbq compile/remediate --app`.
+- **New gym:** follow `qbq/gym/saas`. Write `create_app(active_bugs)` and
   `snapshot(app)`, then `environment.py` with personas and ground truth (bug →
-  synthesized invariant id), and register it in `cubic/gym/__init__.py`.
+  synthesized invariant id), and register it in `qbq/gym/__init__.py`.
 - **New invariant rule:** add it to `compiler/invariants.py`, phrased to hold on correct
   apps and tagged. Check that an existing combinator can test its oracle; otherwise add one.
 - **New model:** implement `RankingModel.complete(RankingPrompt) -> str` or

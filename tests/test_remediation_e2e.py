@@ -4,9 +4,9 @@ from pathlib import Path
 
 import pytest
 
-from cubic.cli import main
-from cubic.gym import load_environment
-from cubic.remediate import FixVerdict, RulePatcher, remediate
+from qbq.cli import main
+from qbq.gym import load_environment
+from qbq.remediate import FixVerdict, RulePatcher, remediate
 
 ROOT = Path(__file__).resolve().parents[1]
 SNAPSHOT = ROOT / "benchmarks/results/remediation_bench.json"
@@ -56,7 +56,7 @@ def test_cli_remediate_writes_tests_patches_and_report(tmp_path, capsys):
     assert len(list(out.glob("test_regression_*.py"))) == 4
     assert len(list(patches.glob("*.patch"))) == 4
     data = json.loads(report.read_text())
-    assert all(f["verified_patch"]["diff"].startswith("--- a/cubic/gym/saas/app.py") for f in data["findings"])
+    assert all(f["verified_patch"]["diff"].startswith("--- a/qbq/gym/saas/app.py") for f in data["findings"])
     assert "patched_source" not in data["findings"][0]["verified_patch"]
 
 

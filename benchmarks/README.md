@@ -7,16 +7,16 @@ generated from the snapshots in `results/` by `summarize.py`.
 | :--- | :--- | :--- |
 | `compile_bench.py` | `results/compile_fintech.json` | Compiler latency per phase (dynamic / static / merge+synthesis / grounding), graph compression, and structural fidelity against the hand-written fintech graph |
 | `ablation_search.py` | `results/search_ablation.json` | Fintech: (1) unfiltered proposals vs verifier-gated findings, for the guided plan and for the unpruned combinator pool; (2) uniform random edge sampling vs graph-guided search (Recall@1 at equal budget, tests needed to reach full recall) |
-| `remediation_bench.py` | `results/remediation_bench.json` | All three gyms: Recall@1 / FPR with and without persona grounding, patch pass rate, first-attempt pass rate, rules used, regression-test validity, per-stage wall clock of `cubic remediate` |
-| `cubic export-rlvr --stats` | `results/rlvr_stats.json` | RLVR dataset: rows, prompts, reward histograms per split, leakage check, dataset SHA-256 |
+| `remediation_bench.py` | `results/remediation_bench.json` | All three gyms: Recall@1 / FPR with and without persona grounding, patch pass rate, first-attempt pass rate, rules used, regression-test validity, per-stage wall clock of `qbq remediate` |
+| `qbq export-rlvr --stats` | `results/rlvr_stats.json` | RLVR dataset: rows, prompts, reward histograms per split, leakage check, dataset SHA-256 |
 | `summarize.py` | `SUMMARY.md` | Renders every table above; `--check` fails if SUMMARY.md is stale |
 
 ```bash
 uv run python benchmarks/compile_bench.py --iterations 25
 uv run python benchmarks/ablation_search.py --runs 3 --seeds 200   # ~25 s
 uv run python benchmarks/remediation_bench.py --runs 3              # ~35 s
-uv run cubic export-rlvr --out datasets/cubic_rlvr.jsonl \
-    --sample-out datasets/cubic_rlvr_sample.jsonl --stats benchmarks/results/rlvr_stats.json   # ~80 s
+uv run qbq export-rlvr --out datasets/qbq_rlvr.jsonl \
+    --sample-out datasets/qbq_rlvr_sample.jsonl --stats benchmarks/results/rlvr_stats.json   # ~80 s
 uv run python benchmarks/summarize.py
 ```
 

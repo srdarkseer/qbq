@@ -3,14 +3,14 @@ import asyncio
 import httpx
 import pytest
 
-from cubic.compiler.invariants import synthesize_invariants
-from cubic.eval import run_eval
-from cubic.graph import HttpMethod, NodeKind, StateGraph, StateNode, TransitionEdge
-from cubic.gym import load_environment
-from cubic.gym.agent_gateway import BUG_IDS, create_app
-from cubic.gym.agent_gateway.environment import BUGS
-from cubic.remediate import remediate
-from cubic.search import CombinatorKind, Oracle, classify_invariant, generate_pool, search
+from qbq.compiler.invariants import synthesize_invariants
+from qbq.eval import run_eval
+from qbq.graph import HttpMethod, NodeKind, StateGraph, StateNode, TransitionEdge
+from qbq.gym import load_environment
+from qbq.gym.agent_gateway import BUG_IDS, create_app
+from qbq.gym.agent_gateway.environment import BUGS
+from qbq.remediate import remediate
+from qbq.search import CombinatorKind, Oracle, classify_invariant, generate_pool, search
 
 ALPHA = {"Authorization": "Bearer tok_alpha_dev"}
 BETA = {"Authorization": "Bearer tok_beta_dev"}

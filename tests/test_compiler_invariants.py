@@ -1,7 +1,7 @@
-from cubic.compiler import compile_app, synthesize_invariants
-from cubic.compiler.static import LedgerSpec
-from cubic.graph import InvariantCategory, LedgerConservationCheck, StateGraph
-from cubic.gym.fintech import create_app
+from qbq.compiler import compile_app, synthesize_invariants
+from qbq.compiler.static import LedgerSpec
+from qbq.graph import InvariantCategory, LedgerConservationCheck, StateGraph
+from qbq.gym.fintech import create_app
 
 GRAPH = compile_app(lambda: create_app()).graph
 IDS = {inv.id for inv in GRAPH.invariants}
@@ -56,7 +56,7 @@ def test_ledger_rule_requires_a_complete_spec():
 
 
 def test_synthesizer_works_on_hand_written_graphs():
-    from cubic.gym.fintech.graph import build_graph
+    from qbq.gym.fintech.graph import build_graph
 
     hand = build_graph()
     invs = {i.id for i in synthesize_invariants(hand)}

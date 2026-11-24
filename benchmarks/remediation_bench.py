@@ -11,7 +11,7 @@ For each app it records:
   closed-loop gate (``patch_pass_rate``), how often the first candidate patch
   passes, which rules fixed what, and whether each exported regression test is
   valid (fails on the unpatched build, passes on the patched code).
-* **Latency.** Wall-clock time of the full ``cubic remediate`` loop on
+* **Latency.** Wall-clock time of the full ``qbq remediate`` loop on
   ``vulnerable``, per stage.
 
 Everything except the ``latency_s`` block is deterministic. That block depends on
@@ -29,12 +29,12 @@ import time
 from collections import Counter
 from pathlib import Path
 
-from cubic import __version__
-from cubic.eval import arun_eval, autonomous_environment
-from cubic.gym import load_environment
-from cubic.gym.base import Environment
-from cubic.remediate import RemediationReport, aremediate
-from cubic.search import HeuristicGraphPolicy
+from qbq import __version__
+from qbq.eval import arun_eval, autonomous_environment
+from qbq.gym import load_environment
+from qbq.gym.base import Environment
+from qbq.remediate import RemediationReport, aremediate
+from qbq.search import HeuristicGraphPolicy
 
 APPS = {"fintech": "fintech-compiled", "saas": "saas-compiled", "agent_gateway": "agent-gateway-compiled"}
 
@@ -118,7 +118,7 @@ def run(runs: int = 3, apps_to_run: tuple[str, ...] = tuple(APPS)) -> dict:
     verified = sum(a["remediation"]["totals"]["verified_patches"] for a in apps.values())
     return {
         "benchmark": "remediation",
-        "cubic_version": __version__,
+        "qbq_version": __version__,
         "runs_per_candidate": runs,
         "summary": {
             "apps": len(apps),

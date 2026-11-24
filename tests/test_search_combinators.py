@@ -1,15 +1,15 @@
 import pytest
 
-from cubic.graph import (
+from qbq.graph import (
     InvariantAssertion,
     InvariantCategory,
     LedgerConservationCheck,
     StateGuardCheck,
     StatusCodeCheck,
 )
-from cubic.gym.fintech.compiled import compiled_graph
-from cubic.gym.fintech.graph import build_graph
-from cubic.search import (
+from qbq.gym.fintech.compiled import compiled_graph
+from qbq.gym.fintech.graph import build_graph
+from qbq.search import (
     BoundaryCase,
     CombinatorKind,
     Oracle,
@@ -23,8 +23,8 @@ from cubic.search import (
     nominal_step,
     parallel_contention,
 )
-from cubic.search.combinators import boundary_values, initial_state_node, prerequisite_path
-from cubic.verifier import validate_candidate
+from qbq.search.combinators import boundary_values, initial_state_node, prerequisite_path
+from qbq.verifier import validate_candidate
 
 G = compiled_graph()
 

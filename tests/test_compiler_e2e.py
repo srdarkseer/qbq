@@ -7,15 +7,15 @@ from pathlib import Path
 import pytest
 from fastapi.routing import APIRoute
 
-from cubic.cli import main
-from cubic.compiler import compare_graphs, compile_app
-from cubic.eval import run_eval
-from cubic.graph import StateGraph
-from cubic.gym import load_environment
-from cubic.gym.fintech import BUGS, create_app
-from cubic.gym.fintech.compiled import BUG_TO_SYNTHESIZED_INVARIANT, compiled_graph
-from cubic.gym.fintech.graph import build_graph
-from cubic.verifier import DeterministicVerifier, Verdict
+from qbq.cli import main
+from qbq.compiler import compare_graphs, compile_app
+from qbq.eval import run_eval
+from qbq.graph import StateGraph
+from qbq.gym import load_environment
+from qbq.gym.fintech import BUGS, create_app
+from qbq.gym.fintech.compiled import BUG_TO_SYNTHESIZED_INVARIANT, compiled_graph
+from qbq.gym.fintech.graph import build_graph
+from qbq.verifier import DeterministicVerifier, Verdict
 
 ROOT = Path(__file__).resolve().parents[1]
 PERSONAS = build_graph().actors
@@ -116,7 +116,7 @@ def test_compile_latency_and_compression_metrics(compiled):
     assert set(r.timings_s) == {"dynamic", "static", "merge_and_synthesis", "grounding", "total"}
     assert r.grounded_records == 3  # one wallet per funded or unfunded user persona
     assert r.graph_bytes == len(compiled.graph.to_json(indent=None).encode())
-    assert r.source_bytes == len((ROOT / "src/cubic/gym/fintech/app.py").read_bytes())
+    assert r.source_bytes == len((ROOT / "src/qbq/gym/fintech/app.py").read_bytes())
     assert r.structural_graph_bytes < r.source_bytes  # structure compresses source
     assert r.compression_ratio == pytest.approx(r.source_bytes / r.graph_bytes)
 
@@ -146,7 +146,7 @@ def _personas_file(tmp_path, as_graph: bool) -> Path:
 @pytest.mark.parametrize("as_graph", [False, True])
 def test_cli_compile_writes_byte_identical_graph(tmp_path, capsys, compiled, as_graph):
     out, report = tmp_path / "out" / "graph.json", tmp_path / "report.json"
-    code = main(["compile", "cubic.gym.fintech.app:create_app", "--out", str(out),
+    code = main(["compile", "qbq.gym.fintech.app:create_app", "--out", str(out),
                  "--personas", str(_personas_file(tmp_path, as_graph)), "--report", str(report)])
     assert code == 0
     assert out.read_text() == compiled.graph.to_json() + "\n"
@@ -158,12 +158,12 @@ def test_cli_compile_writes_byte_identical_graph(tmp_path, capsys, compiled, as_
 
 
 def test_cli_compile_file_target_to_stdout(capsys):
-    assert main(["compile", "src/cubic/gym/fintech/app.py", "--no-invariants", "--no-probe"]) == 0
+    assert main(["compile", "src/qbq/gym/fintech/app.py", "--no-invariants", "--no-probe"]) == 0
     captured = capsys.readouterr()
     graph = StateGraph.from_json(captured.out)
     assert graph.invariants == () and graph.actors == ()
     assert graph.edge("edge.health").metadata["evidence"] == ["openapi", "static"]
-    assert "compiled cubic-fintech-testbed" in captured.err
+    assert "compiled qbq-fintech-testbed" in captured.err
 
 
 def test_cli_compile_bad_target(capsys):

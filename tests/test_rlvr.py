@@ -4,11 +4,11 @@ from pathlib import Path
 
 import pytest
 
-from cubic.cli import main
-from cubic.gym import load_environment
-from cubic.remediate.patcher import load_context
-from cubic.remediate.models import ConfirmedFinding
-from cubic.rlvr import (
+from qbq.cli import main
+from qbq.gym import load_environment
+from qbq.remediate.patcher import load_context
+from qbq.remediate.models import ConfirmedFinding
+from qbq.rlvr import (
     REWARDS,
     LeakageError,
     Outcome,
@@ -24,9 +24,9 @@ from cubic.rlvr import (
     stratified_sample,
     synthetic_bad_patches,
 )
-from cubic.rlvr.rewards import ActionError
-from cubic.search import search
-from cubic.verifier import DeterministicVerifier, Verdict
+from qbq.rlvr.rewards import ActionError
+from qbq.search import search
+from qbq.verifier import DeterministicVerifier, Verdict
 
 ROOT = Path(__file__).resolve().parents[1]
 FINTECH = load_environment("fintech-compiled")

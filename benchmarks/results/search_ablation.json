@@ -1,6 +1,6 @@
 {
   "benchmark": "search_ablation",
-  "cubic_version": "0.1.0",
+  "qbq_version": "0.1.0",
   "environment": "fintech-compiled",
   "variants": [
     "patched",

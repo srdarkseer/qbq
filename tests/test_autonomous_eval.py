@@ -5,12 +5,12 @@ from pathlib import Path
 
 import pytest
 
-from cubic.cli import main
-from cubic.eval import autonomous_environment, plan_for, run_eval
-from cubic.gym import load_environment
-from cubic.gym.fintech import manifest
-from cubic.search import LLMGuidedPolicy, RankingPrompt, SearchConfig
-from cubic.verifier import Verdict
+from qbq.cli import main
+from qbq.eval import autonomous_environment, plan_for, run_eval
+from qbq.gym import load_environment
+from qbq.gym.fintech import manifest
+from qbq.search import LLMGuidedPolicy, RankingPrompt, SearchConfig
+from qbq.verifier import Verdict
 
 ROOT = Path(__file__).resolve().parents[1]
 SNAPSHOT = ROOT / "benchmarks/results/search_ablation.json"

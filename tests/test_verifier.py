@@ -3,7 +3,7 @@ import itertools
 import pytest
 from fastapi import FastAPI
 
-from cubic.graph import (
+from qbq.graph import (
     ActorPersona,
     InvariantAssertion,
     LedgerConservationCheck,
@@ -14,8 +14,8 @@ from cubic.graph import (
     StatusCodeCheck,
     TransitionEdge,
 )
-from cubic.gym import load_environment
-from cubic.verifier import (
+from qbq.gym import load_environment
+from qbq.verifier import (
     ActionStep,
     ActionTrace,
     CandidateFinding,
@@ -123,7 +123,7 @@ def test_race_evidence_shows_double_spend():
 def test_patched_concurrency_spike_allows_exactly_one_withdrawal():
     import asyncio
 
-    from cubic.verifier import replay_trace
+    from qbq.verifier import replay_trace
 
     app = ENV.app_factory(())()
     exchanges = asyncio.run(replay_trace(app, ENV.graph, PROBES["probe.withdraw_concurrency_spike"].trace))
