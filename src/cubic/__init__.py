@@ -1,7 +1,9 @@
 """QbQ ("Cubic"): agentic QA & security testing engine.
 
-Milestone 1 provides the Behavioral State Graph schema, a reference fintech
-testbed, and a deterministic invariant verifier with an evaluation harness.
+Compiles an application into a Behavioral State Graph, searches it for multi-persona
+test sequences, confirms findings with a deterministic 3-of-3 replay verifier, closes
+the loop with gated patches and regression tests, and exports verifiable-reward
+trajectories. See docs/ARCHITECTURE.md.
 """
 
 __version__ = "0.1.0"
